@@ -749,8 +749,8 @@ def run_edit_session(filename, structure, data):
             print("What would you like to change?")
 
             cprint("  1) Change Priority Only", TColors.CYAN)
-            cprint("  2) Toggle Status (Active/Passive)", TColors.CYAN)
-            cprint("  3) Change Priority & Toggle Status", TColors.CYAN)
+            cprint("  2) Change Disabled Status (Active/Passive)", TColors.CYAN)
+            cprint("  3) Change Priority & Disabled Status", TColors.CYAN)
             cprint("  4) DELETE Directive(s)", TColors.RED, bold=True)
             print("")
             cprint("  S) Done (Save Locally)", bold=True)
