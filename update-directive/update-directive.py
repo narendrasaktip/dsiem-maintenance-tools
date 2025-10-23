@@ -88,48 +88,51 @@ class TColors:
 def print_info_box(title, items, icon="ℹ"):
     """Print an information box with dynamic width based on content - FULL BOX"""
     # Calculate maximum content width
-    max_content_length = len(title) + len(icon) + 2
-    
+    max_content_length = len(title) + len(icon) + 2  # title + icon + spaces
+
     for key, value in items:
+        # Calculate visible length (without color codes)
         content_line = "  {}: {}".format(key, str(value))
         max_content_length = max(max_content_length, len(content_line))
-    
-    # Set box dimensions
-    box_width = max_content_length + 4
+
+    # Add padding for borders and ensure reasonable width
+    box_width = max_content_length + 4  # +4 for borders and padding
     inner_width = box_width - 2
-    
+
     # Top border
     print("\n{}┌{}┐{}".format(TColors.CYAN, "─" * inner_width, TColors.RESET))
-    
+
     # Title line
     title_text = " {} {} ".format(icon, title)
-    title_padding = inner_width - len(title_text)
-    print("{}│{}{}{} {}│{}".format(
+    padding = inner_width - len(title_text)
+    # PERBAIKAN: Spasi ekstra dihapus dari sini
+    print("{}│{}{}{} {} │{}".format(
         TColors.CYAN,
         TColors.RESET + TColors.BOLD,
         title_text,
         TColors.RESET,
-        " " * title_padding,
+        " " * padding,
         TColors.CYAN + TColors.RESET
     ))
-    
+
     # Middle border
     print("{}├{}┤{}".format(TColors.CYAN, "─" * inner_width, TColors.RESET))
-    
+
     # Content lines
     for key, value in items:
+        line = "  {}{}: {}{}".format(TColors.YELLOW, key, TColors.WHITE, value)
+        # Calculate visible text length (without ANSI codes)
         visible_text = "  {}: {}".format(key, str(value))
-        content_padding = inner_width - len(visible_text)
-        
-        print("{}│{} {}{}: {}{}{}│{}".format(
+        padding = inner_width - len(visible_text)
+        # PERBAIKAN: Spasi ekstra dihapus dari sini
+        print("{}│{}{}{}│{}".format(
             TColors.CYAN,
             TColors.RESET,
-            TColors.YELLOW, key,
-            TColors.WHITE, value,
-            " " * content_padding,
+            line,
+            " " * max(0, padding),
             TColors.CYAN + TColors.RESET
         ))
-    
+
     # Bottom border
     print("{}└{}┘{}".format(TColors.CYAN, "─" * inner_width, TColors.RESET))
 
@@ -152,55 +155,6 @@ def print_panel(title, content, color=TColors.BLUE, width=78):
     for line in content.split('\n'):
         print("{}│{} {}".format(color, TColors.RESET, line))
     print("{}└{}{}".format(color, "─" * (width-2), TColors.RESET))
-
-def print_info_box(title, items, icon="ℹ"):
-    """Print an information box with dynamic width based on content - FULL BOX"""
-    # Calculate maximum content width
-    max_content_length = len(title) + len(icon) + 2  # title + icon + spaces
-    
-    for key, value in items:
-        # Calculate visible length (without color codes)
-        content_line = "  {}: {}".format(key, str(value))
-        max_content_length = max(max_content_length, len(content_line))
-    
-    # Add padding for borders and ensure reasonable width
-    box_width = max_content_length + 4  # +4 for borders and padding
-    inner_width = box_width - 2
-    
-    # Top border
-    print("\n{}┌{}┐{}".format(TColors.CYAN, "─" * inner_width, TColors.RESET))
-    
-    # Title line
-    title_text = " {} {} ".format(icon, title)
-    padding = inner_width - len(title_text)
-    print("{}│{}{}{} {}│{}".format(
-        TColors.CYAN,
-        TColors.RESET + TColors.BOLD,
-        title_text,
-        TColors.RESET,
-        " " * padding,
-        TColors.CYAN + TColors.RESET
-    ))
-    
-    # Middle border
-    print("{}├{}┤{}".format(TColors.CYAN, "─" * inner_width, TColors.RESET))
-    
-    # Content lines
-    for key, value in items:
-        line = "  {}{}: {}{}".format(TColors.YELLOW, key, TColors.WHITE, value)
-        # Calculate visible text length (without ANSI codes)
-        visible_text = "  {}: {}".format(key, str(value))
-        padding = inner_width - len(visible_text)
-        print("{}│{} {}{}│{}".format(
-            TColors.CYAN,
-            TColors.RESET,
-            line,
-            " " * max(0, padding),
-            TColors.CYAN + TColors.RESET
-        ))
-    
-    # Bottom border
-    print("{}└{}┘{}".format(TColors.CYAN, "─" * inner_width, TColors.RESET))
 
 def print_menu(title, options, show_back=True, show_quit=True):
     """Print a styled menu"""
@@ -784,7 +738,7 @@ def select_directives_from_file(data, show_az_options=False, initial_filter=None
             
             if disabled_on_page:
                 print("\n{}╭─ INACTIVE DIRECTIVES (Disabled: True) {}".format(
-                    TColors.YELLOW + TColors.BOLD, "─" * 41 + "╮" + TColors.RESET
+                    TColors.RED + TColors.BOLD, "─" * 41 + "╮" + TColors.RESET
                 ))
                 for idx, d in enumerate(disabled_on_page):
                     global_index = -1
@@ -805,7 +759,7 @@ def select_directives_from_file(data, show_az_options=False, initial_filter=None
                         TColors.YELLOW, prio_str, TColors.RESET,
                         TColors.DIM, name_str + TColors.RESET
                     ))
-                print("{}╰{}╯{}".format(TColors.YELLOW, "─" * 76, TColors.RESET))
+                print("{}╰{}╯{}".format(TColors.RED, "─" * 76, TColors.RESET))
             
             max_num_on_page = len(page_items)
 
