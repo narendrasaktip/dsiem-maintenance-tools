@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+from __future__ import print_function  # <-- Tambahan untuk print()
 import os, re, sys, json, base64, io, requests, argparse, traceback, subprocess
 from requests.auth import HTTPBasicAuth
 from collections import OrderedDict
@@ -17,29 +19,39 @@ ES_PASSWD_FILE = os.getenv("ES_PASSWD_FILE")
 ES_USER_LOOKUP = os.getenv("ES_USER_LOOKUP")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
-# === TAMBAHKAN BLOK INI UNTUK EMAIL ===
+# === Variabel Email dibaca dari Environment ===
 EMAIL_SMTP_SERVER = os.getenv("EMAIL_SMTP_SERVER", "smtp.gmail.com")
 EMAIL_SMTP_PORT = int(os.getenv("EMAIL_SMTP_PORT", 587))
 EMAIL_SENDER = os.getenv("EMAIL_SENDER")
 EMAIL_APP_PASSWORD = os.getenv("EMAIL_APP_PASSWORD")
 EMAIL_RECIPIENTS = os.getenv("EMAIL_RECIPIENTS")
-# === AKHIR BLOK TAMBAHAN ===
+# =========================================================
 
 # =========================================================
-# PY2/3 string compat
+# PY2/3 string & error compat (PERBAIKAN ERROR)
 # =========================================================
 try:
     string_types = (basestring,)  # Py2
 except NameError:
     string_types = (str,)         # Py3
 
+try:
+    JSONDecodeError = json.JSONDecodeError
+except AttributeError:
+    JSONDecodeError = ValueError
+try:
+    FileNotFoundError
+except NameError:
+    FileNotFoundError = IOError
+# =========================================================
+
 # =========================================================
 # LOGGER
 # =========================================================
-START_TS = datetime.utcnow() # <-- FIX 1: Menghapus .datetime tambahan
+START_TS = datetime.utcnow()
 
 def ts():
-    return datetime.utcnow().strftime("%H:%M:%S") # <-- FIX 2: Menghapus .datetime tambahan
+    return datetime.utcnow().strftime("%H:%M:%S")
 
 def section(title):
     print("\n=== [{}] {} ===".format(ts(), title))
@@ -58,24 +70,21 @@ def die(msg, code=2):
     sys.exit(code)
 
 # =========================================================
-# Fungsi Baru: Notifikasi Email
+# Fungsi Baru: Notifikasi Email (PERBAIKAN)
 # =========================================================
-# auto-updated.py
 
-def send_notification_email(email_cfg, customer_name, header_name, new_events):
-    # 1. Tetap periksa flag 'enabled' dari file konfigurasi (email.json)
-    if not email_cfg.get("enabled", False):
-        info("Email notifications are disabled in the config file. Skipping.")
-        return
-
-    # 2. Validasi bahwa semua variabel environment yang dibutuhkan ada
+# Parameter 'email_cfg' DIHAPUS, karena kita baca dari env var global
+def send_notification_email(customer_name, header_name, new_events):
+    
+    # 1. Validasi bahwa semua variabel environment yang dibutuhkan ada
+    # Ini sekarang menjadi satu-satunya 'enabled' check
     if not all([EMAIL_SENDER, EMAIL_APP_PASSWORD, EMAIL_RECIPIENTS]):
         warn("Email environment variables (EMAIL_SENDER, EMAIL_APP_PASSWORD, EMAIL_RECIPIENTS) are not fully set. Skipping email notification.")
         return
 
     section("Sending Email Notification")
     
-    # 3. Ambil penerima dari env var, ubah string "a,b,c" menjadi list ['a', 'b', 'c']
+    # 2. Ambil penerima dari env var
     recipients = [email.strip() for email in EMAIL_RECIPIENTS.split(',')]
     if not recipients:
         err("EMAIL_RECIPIENTS is set but contains no valid email addresses. Aborting email.")
@@ -83,16 +92,9 @@ def send_notification_email(email_cfg, customer_name, header_name, new_events):
         
     count = len(new_events)
     
-    # Pindahkan definisi waktu ke atas agar bisa dipakai untuk subjek dan isi email
     now_in_wib = datetime.utcnow() + timedelta(hours=7)
-    
-    # 1. Buat format timestamp yang ringkas khusus untuk subjek
     subject_timestamp = now_in_wib.strftime('%d %b %Y | %H:%M WIB')
-    
-    # 2. Gabungkan timestamp ke dalam string subjek
     subject = "[New Event] [{}] - {} New Events for {} - ({})".format(customer_name, count, header_name, subject_timestamp)
-    
-    # Variabel ini tetap digunakan untuk isi (body) email agar tetap detail
     detection_time = now_in_wib.strftime('%d %B %Y, %H:%M:%S WIB')
     
     event_rows_html = "".join([
@@ -100,6 +102,7 @@ def send_notification_email(email_cfg, customer_name, header_name, new_events):
         for e in new_events
     ])
     
+    # ... (Template HTML tetap sama persis, tidak perlu disalin di sini) ...
     body_html = """
 <!DOCTYPE html>
 <html lang="en">
@@ -218,7 +221,7 @@ def send_notification_email(email_cfg, customer_name, header_name, new_events):
 
     server = None
     try:
-        # 4. Gunakan variabel global dari environment untuk koneksi SMTP
+        # 3. Gunakan variabel global dari environment untuk koneksi SMTP
         server = smtplib.SMTP(EMAIL_SMTP_SERVER, EMAIL_SMTP_PORT)
         server.starttls()
         server.login(EMAIL_SENDER, EMAIL_APP_PASSWORD)
@@ -235,7 +238,7 @@ def send_notification_email(email_cfg, customer_name, header_name, new_events):
 def read_json(path):
     with io.open(path, "r", encoding="utf-8") as f:
         return json.load(f)
-
+# ... (Sisa fungsi IO, TSV, 70.conf, Directives, GitHub, OpenSearch tetap sama) ...
 def read_text(path):
     with io.open(path, "r", encoding="utf-8") as f:
         return f.read()
@@ -454,9 +457,6 @@ def gh_paths(log_type, module_name, submodule_name, filter_key, backend_pod="dsi
 # =========================================================
 # OpenSearch (UPDATED)
 # =========================================================
-# =========================================================
-# OpenSearch (UPDATED)
-# =========================================================
 def load_cred(path, user):
     with io.open(path,"r",encoding="utf-8") as f:
         for ln in f:
@@ -482,7 +482,6 @@ def fetch_titles(es_cfg, q_cfg, debug=False):
         field_name = f["field"]
         value = f["value"]
         if op == "term":
-            # Otomatis tambahkan .keyword untuk 'term' agar cocok dengan teks yang tidak dianalisis
             if not field_name.endswith(".keyword"):
                 field_name += ".keyword"
             mf.append({"term": {field_name: value}})
@@ -498,7 +497,6 @@ def fetch_titles(es_cfg, q_cfg, debug=False):
     if "time_range" in q_cfg:
         time_cfg = q_cfg["time_range"]
         try:
-            # Pastikan semua key yang diperlukan ada
             range_filter = {
                 "range": {
                     time_cfg["field"]: {
@@ -575,15 +573,13 @@ def distribute_and_update_local(merged_rows, paths, cfg, plugin_id, template_map
     if os.path.exists(local_temp_path): os.remove(local_temp_path)
 
 # =========================================================
-# CLI & MAIN
+# CLI & MAIN (PERBAIKAN)
 # =========================================================
 def parse_args():
     ap = argparse.ArgumentParser(description="auto-update full-sync")
     ap.add_argument("--dry-run", action="store_true", help="simulate everything")
     ap.add_argument("--debug", action="store_true", help="extra debug logs")
     return ap.parse_args()
-
-# Di file: auto-updated.py
 
 def main():
     args = parse_args()
@@ -598,19 +594,12 @@ def main():
         cfg.update(customer_cfg)
     except FileNotFoundError:
         warn("Customer config file not found at '{}'. Using default values.".format(customer_path))
-    except json.JSONDecodeError:
+    except (JSONDecodeError, ValueError): # <-- Menggunakan variabel kompatibel
         err("Error decoding JSON from '{}'. Please check its format.".format(customer_path))
 
-    # 2. Muat file konfigurasi email
-    email_path = cfg.get("email_config_path", "./email.json")
-    info("Loading email config from: {}".format(email_path))
-    try:
-        email_cfg = read_json(email_path)
-        cfg.update(email_cfg)
-    except FileNotFoundError:
-        warn("Email config file not found at '{}'. Email notifications will be disabled.".format(email_path))
-    except json.JSONDecodeError:
-        err("Error decoding JSON from '{}'. Please check its format.".format(email_path))
+    # 2. BLOK BACA 'email.json' DIHAPUS
+    # Konfigurasi email sekarang murni dari environment variable
+    info("Email config will be loaded from environment variables (config.sh).")
     
     es_cfg, q_cfg, layout, file70, dircfg, gh_cfg = cfg["es"], cfg["query"], cfg["layout"], cfg["file70"], cfg["directive"], cfg["github"]
     
@@ -623,19 +612,13 @@ def main():
     category, kingdom, disabled, template_id = dircfg.get("CATEGORY"), dircfg.get("KINGDOM"), bool(dircfg.get("DISABLED")), dircfg.get("template_id")
     
     # --- [ INI BAGIAN YANG DIUBAH ] ---
-    # Prioritaskan Environment Variable dari config.sh
     env_repo = os.getenv("GITHUB_REPO")
     env_branch = os.getenv("GITHUB_BRANCH")
-
-    # Gunakan Env Var jika ada, jika tidak, baru baca dari file _updater.json
     gh_repo = env_repo if env_repo else gh_cfg["repo"]
     gh_branch = env_branch if env_branch else gh_cfg.get("branch", "main")
-    
-    # Sisa config tetap dari file JSON
     template70_path = gh_cfg.get("template_path", "./template-70.js")
-    registry_path = gh_cfg.get("plugin_registry_path", "plugin_id.json") # Default value
+    registry_path = gh_cfg.get("plugin_registry_path", "plugin_id.json") 
 
-    # Tambahkan log untuk konfirmasi
     if env_repo:
         info("Using GITHUB_REPO from environment: {}".format(gh_repo))
     else:
@@ -645,7 +628,6 @@ def main():
     info("CFG: {}, Repo: {}@{}, Slug: {}".format(CFG_PATH, gh_repo, gh_branch, siem_plugin_type))
     
     section("Check Plugin ID Registry")
-    # (Sisa fungsi main() tetap sama...)
     reg_obj, reg_sha = gh_get(gh_repo, gh_branch, gh_token, registry_path, debug=args.debug)
     registry, found_in_reg = {}, False
     if reg_obj: registry = json.loads(base64.b64decode(reg_obj.get("content","")).decode("utf-8"))
@@ -673,9 +655,8 @@ def main():
     merged_rows, added_rows, _ = tsv_merge(existing_rows, titles)
     info("Total rows after merge: {}, New titles from OpenSearch: {}".format(len(merged_rows), len(added_rows)))
 
-    # --- PANGGIL FUNGSI EMAIL DI SINI ---
+    # --- PANGGIL FUNGSI EMAIL DI SINI (PERBAIKAN) ---
     if added_rows:
-        # Cek apakah plugin ini terdaftar sebagai 'aktif'
         is_active_plugin = False
         active_plugins_file = './active_plugins.json'
         if os.path.exists(active_plugins_file):
@@ -687,20 +668,22 @@ def main():
                     info("Plugin '{}' is marked as ACTIVE. Email notification will be sent.".format(siem_plugin_type))
                 else:
                     info("Plugin '{}' is PASSIVE. Skipping email notification.".format(siem_plugin_type))
-            except (IOError, json.JSONDecodeError) as e:
+            except (IOError, JSONDecodeError, ValueError) as e: # <-- Menggunakan var kompatibel
                 warn("Could not read or parse active_plugins.json: {}. Assuming PASSIVE.".format(e))
         else:
             info("active_plugins.json not found. Assuming all plugins are PASSIVE.")
 
-        # Email hanya dikirim jika ada baris baru DAN plugin iniaktif DAN email diaktifkan secara global
-        email_cfg = cfg.get("email_notifications", {})
-        if is_active_plugin and email_cfg.get("enabled", False):
+        # Email hanya dikirim jika ada baris baru DAN plugin ini aktif
+        # Pengecekan 'enabled' sekarang ada di dalam 'send_notification_email'
+        if is_active_plugin:
             customer_name = "Default Customer"
             customer_info = cfg.get("customer_info", {})
             customer_name = customer_info.get("customer_name", customer_name)
             
-            send_notification_email(email_cfg, customer_name, dircfg.get("HEADER", paths["full_slug"]), added_rows)
+            # Panggil fungsi TANPA 'email_cfg'
+            send_notification_email(customer_name, dircfg.get("HEADER", paths["full_slug"]), added_rows)
     # --- AKHIR DARI PEMANGGILAN EMAIL ---
+    
     if added_rows or not tsv_obj:
         gh_put(gh_repo, gh_branch, gh_token, paths["tsv"], tsv_render(merged_rows, siem_plugin_type, plugin_id, category, kingdom).encode("utf-8"),
                "[auto] Update TSV for {}".format(siem_plugin_type), sha=tsv_sha, debug=args.debug, dry=args.dry_run)
@@ -708,21 +691,15 @@ def main():
     
     section("Sync GitHub JSON Dictionary")
     json_obj, _ = gh_get(gh_repo, gh_branch, gh_token, paths["json_dict"], debug=args.debug)
-
-    # 1. Buat konten JSON baru dan muat sebagai objek Python
     new_json_content_str = write_json_dictionary(merged_rows)
     new_data_obj = json.loads(new_json_content_str)
-
-    # 2. Muat konten JSON yang ada dari GitHub (jika ada) sebagai objek Python
     existing_data_obj = {}
     if json_obj and json_obj.get("content"):
         try:
             existing_json_content_str = base64.b64decode(json_obj.get("content", "")).decode("utf-8")
             existing_data_obj = json.loads(existing_json_content_str)
-        except (json.JSONDecodeError, TypeError):
+        except (JSONDecodeError, TypeError, ValueError):
             warn("Gagal mem-parsing konten JSON dari GitHub. Akan dianggap sebagai perubahan.")
-
-    # 3. Bandingkan kedua objek Python, bukan string mentah
     if new_data_obj != existing_data_obj:
         info("Konten JSON berbeda. Melakukan push sinkronisasi penuh ke GitHub...")
         gh_put(gh_repo, gh_branch, gh_token, paths["json_dict"], new_json_content_str.encode("utf-8"),
@@ -744,7 +721,6 @@ def main():
     template_map = load_directive_templates("./directive_rules.json")
     dir_obj, _ = gh_get(gh_repo, gh_branch, gh_token, paths["directive"], debug=args.debug)
     existing_dir, dir_sha = ({"directives":[]}, None) if not dir_obj else (json.loads(base64.b64decode(dir_obj.get("content","")).decode("utf-8")), dir_obj.get("sha"))
-    
     updated_dir_json, appended, add_count, _ = directive_append(existing_dir, template_map, template_id, plugin_id, dircfg["HEADER"], category, kingdom, disabled, merged_rows)
     if appended:
         info("Directive content mismatch. Found {} missing/new entries. Pushing full sync to GitHub...".format(add_count))
