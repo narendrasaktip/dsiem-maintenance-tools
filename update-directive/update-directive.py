@@ -361,6 +361,14 @@ def search_and_select_file():
             print_success("Found match: {}".format(selected_file))
             print_loading("Copying {}...".format(selected_file))
             
+            # --- PATCH 4a START ---
+            try: 
+                os.chdir(LOCAL_DIR)
+            except OSError as e:
+                print_error("Failed to cd into {}: {}".format(LOCAL_DIR, e))
+                return None, None
+            # --- PATCH 4a END ---
+
             cp_cmd = ["kubectl", "cp", "{}:{}{}".format(POD_NAME, REMOTE_PATH, selected_file), "./{}".format(selected_file)]
             if run_command(cp_cmd) is None:
                 print_error("Failed to copy.")
@@ -391,6 +399,14 @@ def search_and_select_file():
                         print_success("Selected: {}".format(selected_file))
                         print_loading("Copying {}...".format(selected_file))
                         
+                        # --- PATCH 4b START ---
+                        try: 
+                            os.chdir(LOCAL_DIR)
+                        except OSError as e:
+                            print_error("Failed to cd into {}: {}".format(LOCAL_DIR, e))
+                            break # Ini akan keluar dari loop while True
+                        # --- PATCH 4b END ---
+
                         cp_cmd = ["kubectl", "cp", "{}:{}{}".format(POD_NAME, REMOTE_PATH, selected_file), "./{}".format(selected_file)]
                         if run_command(cp_cmd) is None:
                             print_error("Failed to copy.")
@@ -425,13 +441,15 @@ def setup_and_select_file():
                 print_error("Failed to create dir {}: {}".format(LOCAL_DIR, e))
                 sys.exit(1)
         
-        try:
-            os.chdir(LOCAL_DIR)
-        except OSError as e:
-            print_error("Failed to cd into {}: {}".format(LOCAL_DIR, e))
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            os.chdir(script_dir)
-            sys.exit(1)
+        # --- PATCH 2 START (Blok os.chdir DIHAPUS DARI SINI) ---
+        # try:
+        #     os.chdir(LOCAL_DIR)
+        # except OSError as e:
+        #     print_error("Failed to cd into {}: {}".format(LOCAL_DIR, e))
+        #     script_dir = os.path.dirname(os.path.abspath(__file__))
+        #     os.chdir(script_dir)
+        #     sys.exit(1)
+        # --- PATCH 2 END ---
 
         print_menu("Select File Method", [
             ("1", "Select from file list", TColors.CYAN),
@@ -483,6 +501,14 @@ def setup_and_select_file():
                         selected_file = file_names[choice_idx]
                         print_success("Selected: {}".format(selected_file))
                         print_loading("Copying {}...".format(selected_file))
+                        
+                        # --- PATCH 3 START ---
+                        try: 
+                            os.chdir(LOCAL_DIR)
+                        except OSError as e:
+                            print_error("Failed to cd into {}: {}".format(LOCAL_DIR, e))
+                            break
+                        # --- PATCH 3 END ---
                         
                         cp_cmd = ["kubectl", "cp", "{}:{}{}".format(POD_NAME, REMOTE_PATH, selected_file), "./{}".format(selected_file)]
                         if run_command(cp_cmd) is None:
@@ -1111,6 +1137,9 @@ def main():
         check_deps()
         
         while True:
+            # --- PATCH 1 START ---
+            os.chdir(script_dir)
+            # --- PATCH 1 END ---
             selected_file, initial_filter = setup_and_select_file()
             if selected_file:
                 structure, data = check_file_structure(selected_file)
