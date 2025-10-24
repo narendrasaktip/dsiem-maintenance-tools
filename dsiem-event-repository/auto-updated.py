@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function  # <-- Tambahan untuk print()
+from __future__ import print_function
 import os, re, sys, json, base64, io, requests, argparse, traceback, subprocess
 from requests.auth import HTTPBasicAuth
 from collections import OrderedDict
@@ -14,12 +14,12 @@ from datetime import datetime, timedelta
 CFG_PATH = os.getenv("SYNC_CFG", "./auto-updater.json")
 DEFAULT_GH_API_VERSION = "2022-11-28"
 
-# Membaca kredensial dari Environment Variables, sama seperti main.py
+# Membaca kredensial dari Environment Variables
 ES_PASSWD_FILE = os.getenv("ES_PASSWD_FILE")
 ES_USER_LOOKUP = os.getenv("ES_USER_LOOKUP")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
-# === Variabel Email dibaca dari Environment ===
+# Variabel Email dibaca dari Environment
 EMAIL_SMTP_SERVER = os.getenv("EMAIL_SMTP_SERVER", "smtp.gmail.com")
 EMAIL_SMTP_PORT = int(os.getenv("EMAIL_SMTP_PORT", 587))
 EMAIL_SENDER = os.getenv("EMAIL_SENDER")
@@ -28,13 +28,12 @@ EMAIL_RECIPIENTS = os.getenv("EMAIL_RECIPIENTS")
 # =========================================================
 
 # =========================================================
-# PY2/3 string & error compat (PERBAIKAN ERROR)
+# PY2/3 string & error compat
 # =========================================================
 try:
-    string_types = (basestring,)  # Py2
+    string_types = (basestring,)
 except NameError:
-    string_types = (str,)         # Py3
-
+    string_types = (str,)
 try:
     JSONDecodeError = json.JSONDecodeError
 except AttributeError:
@@ -49,60 +48,35 @@ except NameError:
 # LOGGER
 # =========================================================
 START_TS = datetime.utcnow()
-
-def ts():
-    return datetime.utcnow().strftime("%H:%M:%S")
-
-def section(title):
-    print("\n=== [{}] {} ===".format(ts(), title))
-
-def info(msg):
-    print("[{}] {}".format(ts(), msg))
-
-def warn(msg):
-    print("[{}][WARN] {}".format(ts(), msg))
-
-def err(msg):
-    print("[{}][ERROR] {}".format(ts(), msg))
-
-def die(msg, code=2):
-    err(msg)
-    sys.exit(code)
-
-# =========================================================
-# Fungsi Baru: Notifikasi Email (PERBAIKAN)
+def ts(): return datetime.utcnow().strftime("%H:%M:%S")
+def section(title): print("\n=== [{}] {} ===".format(ts(), title))
+def info(msg): print("[{}] {}".format(ts(), msg))
+def warn(msg): print("[{}][WARN] {}".format(ts(), msg))
+def err(msg): print("[{}][ERROR] {}".format(ts(), msg))
+def die(msg, code=2): err(msg); sys.exit(code)
 # =========================================================
 
-# Parameter 'email_cfg' DIHAPUS, karena kita baca dari env var global
+# =========================================================
+# Fungsi Notifikasi Email
+# =========================================================
 def send_notification_email(customer_name, header_name, new_events):
-    
-    # 1. Validasi bahwa semua variabel environment yang dibutuhkan ada
-    # Ini sekarang menjadi satu-satunya 'enabled' check
     if not all([EMAIL_SENDER, EMAIL_APP_PASSWORD, EMAIL_RECIPIENTS]):
-        warn("Email environment variables (EMAIL_SENDER, EMAIL_APP_PASSWORD, EMAIL_RECIPIENTS) are not fully set. Skipping email notification.")
+        warn("Email environment variables not fully set. Skipping email.")
         return
-
     section("Sending Email Notification")
-    
-    # 2. Ambil penerima dari env var
-    recipients = [email.strip() for email in EMAIL_RECIPIENTS.split(',')]
+    recipients = [email.strip() for email in EMAIL_RECIPIENTS.split(',') if email.strip()]
     if not recipients:
-        err("EMAIL_RECIPIENTS is set but contains no valid email addresses. Aborting email.")
+        err("EMAIL_RECIPIENTS contains no valid addresses. Aborting email.")
         return
-        
     count = len(new_events)
-    
     now_in_wib = datetime.utcnow() + timedelta(hours=7)
     subject_timestamp = now_in_wib.strftime('%d %b %Y | %H:%M WIB')
     subject = "[New Event] [{}] - {} New Events for {} - ({})".format(customer_name, count, header_name, subject_timestamp)
     detection_time = now_in_wib.strftime('%d %B %Y, %H:%M:%S WIB')
-    
     event_rows_html = "".join([
         "<tr><td style='padding: 8px; border: 1px solid #ddd;'>{}</td><td style='padding: 8px; border: 1px solid #ddd;'>{}</td></tr>".format(e["plugin_sid"], e["event_name"])
         for e in new_events
     ])
-    
-    # ... (Template HTML tetap sama persis, tidak perlu disalin di sini) ...
     body_html = """
 <!DOCTYPE html>
 <html lang="en">
@@ -205,23 +179,16 @@ def send_notification_email(customer_name, header_name, new_events):
     </body>
 </html>
     """.format(
-        customer=customer_name,
-        plugin=header_name,
-        count=count,
-        time=detection_time,
-        event_rows=event_rows_html
+        customer=customer_name, plugin=header_name, count=count,
+        time=detection_time, event_rows=event_rows_html
     )
-
-    # Setup MIME
     msg = MIMEMultipart('alternative')
     msg['From'] = EMAIL_SENDER
     msg['To'] = ", ".join(recipients)
     msg['Subject'] = subject
     msg.attach(MIMEText(body_html, 'html'))
-
     server = None
     try:
-        # 3. Gunakan variabel global dari environment untuk koneksi SMTP
         server = smtplib.SMTP(EMAIL_SMTP_SERVER, EMAIL_SMTP_PORT)
         server.starttls()
         server.login(EMAIL_SENDER, EMAIL_APP_PASSWORD)
@@ -230,59 +197,45 @@ def send_notification_email(customer_name, header_name, new_events):
     except Exception as e:
         err("Failed to send email: {}".format(e))
     finally:
-        if server:
-            server.quit()
+        if server: server.quit()
+# =========================================================
+
 # =========================================================
 # IO Utils & Shell Helper
 # =========================================================
 def read_json(path):
     with io.open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-# ... (Sisa fungsi IO, TSV, 70.conf, Directives, GitHub, OpenSearch tetap sama) ...
+        return json.load(f, object_pairs_hook=OrderedDict) # Baca dengan urutan
 def read_text(path):
     with io.open(path, "r", encoding="utf-8") as f:
         return f.read()
-
 def slug(s):
     if s is None: return ""
-    s = s.strip()
-    s = re.sub(r'[^a-zA-Z0-9]+', '-', s) 
-    s = re.sub(r'-+', '-', s).strip('-')
-    return s
-
-def alarm_id(plugin_id, sid):
-    return int(plugin_id) * 10000 + int(sid)
-
+    s = s.strip().lower(); s = re.sub(r'[^a-z0-9]+', '-', s); s = re.sub(r'-+', '-', s).strip('-'); return s
+def alarm_id(plugin_id, sid): return int(plugin_id) * 10000 + int(sid)
 def run_cmd(cmd_list, dry=False):
-    """Menjalankan perintah sebagai subprocess dan mengembalikan return code."""
     info("Executing command: {}".format(" ".join(cmd_list)))
-    if dry:
-        info("[DRY-RUN] Command not executed.")
-        return 0
+    if dry: info("[DRY-RUN] Command not executed."); return 0 # Return 0 for success in dry run
     try:
         p = subprocess.Popen(cmd_list, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = p.communicate()
         if p.returncode != 0:
             warn("Command failed with code {}:\n{}".format(p.returncode, err.decode('utf-8', 'replace')))
+        # Return the actual return code
         return p.returncode
     except OSError as e:
-        err("Gagal menjalankan command: {}".format(e))
-        return 1
-        
+        err("Gagal menjalankan command: {}".format(e)); return 1
 def write_json_dictionary(rows):
-    """Membuat konten string JSON dari baris TSV, diurutkan berdasarkan SID."""
     pairs = []
     for r in rows or []:
         ev = r.get("event_name", "").strip()
         if not ev: continue
-        try:
-            sid = int(r.get("plugin_sid", 0))
-            pairs.append((ev, sid))
-        except Exception:
-            continue
+        try: sid = int(r.get("plugin_sid", 0)); pairs.append((ev, sid))
+        except Exception: continue
     pairs.sort(key=lambda x: (x[1], x[0]))
     ordered = OrderedDict((k, v) for k, v in pairs)
     return json.dumps(ordered, ensure_ascii=False, indent=2)
+# =========================================================
 
 # =========================================================
 # TSV (6 kolom)
@@ -297,174 +250,143 @@ def tsv_render(rows, plugin_label, plugin_id, category, kingdom):
             str(r.get("event_name", "")).replace("\t", " "), str(category or ""), str(kingdom or "")
         ))
     return "\n".join(out) + "\n"
-
 def tsv_parse(text):
     rows, meta = [], {}
-    lines = text.splitlines()
+    lines = text.splitlines();
     if not lines: return rows, meta
     header = lines[0].strip().lower()
-    if not header.startswith("plugin\t"): return rows, meta
+    if not header.startswith("plugin\t"): return rows, meta # Hanya support format baru
     hdr = [h.strip() for h in lines[0].split("\t")]
     for i, line in enumerate(lines[1:]):
         parts = line.strip().split("\t")
         if len(parts) != len(hdr): continue
         row_map = dict(zip(hdr, parts))
-        try:
-            sid = int(row_map.get("sid","0"))
-            rows.append({"plugin_sid": sid, "event_name": row_map.get("title","")})
+        try: sid = int(row_map.get("sid","0")); rows.append({"plugin_sid": sid, "event_name": row_map.get("title","")})
         except: continue
     return rows, meta
-
 def tsv_merge(existing_rows, new_event_names):
-    rows = list(existing_rows)
-    known = set(r["event_name"] for r in existing_rows)
+    rows = list(existing_rows); known = set(r["event_name"] for r in existing_rows)
     existing_sids = [int(r.get("plugin_sid", 0)) for r in existing_rows]
     max_sid = max(existing_sids) if existing_sids else 0
     added_rows = []
     for ev in new_event_names:
         if ev not in known:
-            max_sid += 1
-            nr = {"plugin_sid": max_sid, "event_name": ev}
+            max_sid += 1; nr = {"plugin_sid": max_sid, "event_name": ev}
             rows.append(nr); known.add(ev); added_rows.append(nr)
     return rows, added_rows, max_sid
+# =========================================================
 
 # =========================================================
 # 70.conf Template Generator
 # =========================================================
 def generate_conf70_from_template(template_path, plugin_id, log_type, siem_plugin_type, field_name, category, json_dict_path_on_server):
-    if not os.path.exists(template_path):
-        die("Template 70.conf tidak ditemukan di: {}".format(template_path))
+    if not os.path.exists(template_path): die("Template 70.conf not found: {}".format(template_path))
     tpl = read_text(template_path)
     tpl = tpl.replace("{plugin_id}", str(plugin_id))
     tpl = tpl.replace("{siem_plugin_type}", siem_plugin_type)
     tpl = tpl.replace("{log_type}", log_type)
-    tpl = tpl.replace("{field}", field_name)
+    tpl = tpl.replace("{field}", field_name) # Asumsi field sudah di-bracket [field]
     tpl = tpl.replace("{category}", category)
     tpl = tpl.replace("{dictionary_path}", json_dict_path_on_server)
+    # Tambahkan refresh interval jika ada placeholder
+    tpl = tpl.replace("{refresh_interval}", "60") # Default 60 detik
     return tpl
+# =========================================================
 
 # =========================================================
-# Directives (UPDATED)
+# Directives
 # =========================================================
 def load_directive_templates(path="./directive_rules.json"):
-    if not os.path.exists(path): die("File directive_rules.json tidak ditemukan.")
+    if not os.path.exists(path): die("File directive_rules.json not found.")
     return read_json(path)
-
 def order_rule_fields(rule):
-    """Mengurutkan key di dalam sebuah rule agar sesuai format standar."""
     order = ["stage","name","plugin_id","plugin_sid","occurrence","reliability","timeout", "from","to","port_from","port_to","protocol","type","custom_data1","custom_data2","custom_data3"]
     out = OrderedDict()
     for k in order:
         if k in rule: out[k] = rule[k]
-    # Tambahkan key lain jika ada (untuk fleksibilitas)
     for k, v in rule.items():
         if k not in out: out[k] = v
     return out
-
 def build_directive_entry(template_rules, plugin_id, title, sid, header, category, kingdom, disabled=False, priority=3):
     _id = alarm_id(plugin_id, sid)
-    
-    # --- FUNGSI SUBST YANG DIPERBARUI ---
     def subst(obj):
-        if isinstance(obj, dict):
-            return {k: subst(v) for k, v in obj.items()}
-        if isinstance(obj, list):
-            return [subst(x) for x in obj]
-        
-        # Cek placeholder secara spesifik untuk menjaga tipe data
-        if obj == "{PLUGIN_ID}":
-            return plugin_id  # Mengembalikan integer
-        if obj == "{SID}":
-            return sid        # Mengembalikan integer
-            
-        # Jika bukan placeholder khusus, lakukan replace standar untuk string lain
-        if isinstance(obj, string_types):
-            return obj.replace("{TITLE}", title)
-            
+        if isinstance(obj, dict): return {k: subst(v) for k, v in obj.items()}
+        if isinstance(obj, list): return [subst(x) for x in obj]
+        if obj == "{PLUGIN_ID}": return plugin_id
+        if obj == "{SID}": return sid
+        if isinstance(obj, string_types): return obj.replace("{TITLE}", title)
         return obj
-    # --- AKHIR DARI FUNGSI SUBST YANG DIPERBARUI ---
-
-    # Proses rules: lakukan substitusi LALU urutkan field-nya
     processed_rules = [order_rule_fields(subst(r)) for r in template_rules]
-    
-    # Buat directive utama dengan OrderedDict untuk menjaga urutan
     directive_obj = OrderedDict()
-    directive_obj["id"] = _id
-    directive_obj["name"] = "{}, {}".format(header, title.title())
-    directive_obj["category"] = category
-    directive_obj["kingdom"] = kingdom
-    directive_obj["priority"] = priority
-    directive_obj["all_rules_always_active"] = False
-    directive_obj["disabled"] = bool(disabled)
-    directive_obj["rules"] = processed_rules
-    
+    directive_obj["id"] = _id; directive_obj["name"] = "{}, {}".format(header, title.title())
+    directive_obj["category"] = category; directive_obj["kingdom"] = kingdom
+    directive_obj["priority"] = priority; directive_obj["all_rules_always_active"] = False
+    directive_obj["disabled"] = bool(disabled); directive_obj["rules"] = processed_rules
     return directive_obj
-
 def directive_append(existing_json, template_map, template_id, plugin_id, header, category, kingdom, disabled, rows_to_process):
-    if not isinstance(existing_json, dict) or "directives" not in existing_json:
-        existing_json = {"directives": []}
-    directives = existing_json["directives"]
-    exist_ids = set(d.get("id", 0) for d in directives)
+    if not isinstance(existing_json, dict) or "directives" not in existing_json: existing_json = {"directives": []}
+    directives = existing_json["directives"]; exist_ids = set(d.get("id", 0) for d in directives)
     tpl_rules = template_map.get(template_id)
-    if not tpl_rules: die("[Directive] template_id '{}' tidak ditemukan di directive_rules.json".format(template_id))
+    if not tpl_rules: die("[Directive] template_id '{}' not found.".format(template_id))
     appended, add_count = False, 0
     for r in rows_to_process:
-        sid = int(r["plugin_sid"])
+        try: sid = int(r["plugin_sid"])
+        except (KeyError, ValueError): continue # Lewati jika SID tidak valid
         _id = alarm_id(plugin_id, sid)
         if _id in exist_ids: continue
-        entry = build_directive_entry(tpl_rules, plugin_id, r["event_name"], sid, header, category, kingdom, disabled=disabled)
-        directives.append(entry)
-        appended, add_count = True, add_count + 1
+        entry = build_directive_entry(tpl_rules, plugin_id, r.get("event_name",""), sid, header, category, kingdom, disabled=disabled)
+        directives.append(entry); appended, add_count = True, add_count + 1
     if appended: existing_json["directives"] = sorted(directives, key=lambda x: x.get("id", 0))
     return existing_json, appended, add_count, None
+# =========================================================
 
 # =========================================================
 # GitHub
 # =========================================================
-def gh_headers(token):
-    return {"Accept":"application/vnd.github+json", "Authorization":"Bearer {}".format(token), "X-GitHub-Api-Version": DEFAULT_GH_API_VERSION}
+def gh_headers(token): return {"Accept":"application/vnd.github+json", "Authorization":"Bearer {}".format(token), "X-GitHub-Api-Version": DEFAULT_GH_API_VERSION}
 def gh_get(repo, branch, token, path, debug=False):
-    url = "https://api.github.com/repos/{}/contents/{}".format(repo, path)
-    r = requests.get(url, headers=gh_headers(token), params={"ref": branch}, timeout=60)
+    url = "https://api.github.com/repos/{}/contents/{}".format(repo, path.replace("\\", "/"))
+    try: r = requests.get(url, headers=gh_headers(token), params={"ref": branch}, timeout=60)
+    except requests.exceptions.RequestException as e: die("GitHub GET Error: {}".format(e)); return None, None
     if debug: info("GET {} -> {}".format(url, r.status_code))
     if r.status_code == 404: return None, None
-    r.raise_for_status()
-    return r.json(), r.headers.get("x-github-request-id")
+    if r.status_code >= 300: die("GitHub GET Error {}: {}".format(r.status_code, r.text[:200])); return None, None
+    try: return r.json(), r.headers.get("x-github-request-id")
+    except ValueError: die("GitHub GET Response is not valid JSON."); return None, None
 def gh_put(repo, branch, token, path, bytes_content, message, sha=None, debug=False, dry=False):
-    url = "https://api.github.com/repos/{}/contents/{}".format(repo, path)
+    url = "https://api.github.com/repos/{}/contents/{}".format(repo, path.replace("\\", "/"))
     payload = {"message": message, "content": base64.b64encode(bytes_content).decode("ascii"), "branch": branch}
     if sha: payload["sha"] = sha
-    if dry:
-        info("[DRY-RUN] PUT {} ({} bytes), msg='{}' sha={}".format(path, len(bytes_content), message, sha))
-        return {}
-    r = requests.put(url, headers=gh_headers(token), data=json.dumps(payload), timeout=60)
+    if dry: info("[DRY-RUN] PUT {} ({} bytes)...".format(path, len(bytes_content))); return {}
+    try: r = requests.put(url, headers=gh_headers(token), data=json.dumps(payload), timeout=60)
+    except requests.exceptions.RequestException as e: die("GitHub PUT Error: {}".format(e)); return {}
     if debug: info("PUT {} -> {}".format(url, r.status_code))
-    if r.status_code >= 300: die("[GITHUB PUT ERROR] {} {}\n{}".format(r.status_code, path, r.text[:400]))
-    return r.json()
+    if r.status_code >= 300: die("GitHub PUT Error {} {}:\n{}".format(r.status_code, path, r.text[:400])); return {}
+    try: return r.json()
+    except ValueError: die("GitHub PUT Response is not valid JSON."); return {}
 def gh_paths(log_type, module_name, submodule_name, filter_key, backend_pod="dsiem-backend-0"):
     parts = [p for p in [slug(log_type), slug(module_name), slug(submodule_name), slug(filter_key)] if p]
-    unique_parts = list(OrderedDict.fromkeys(parts))
-    full_slug = "-".join(unique_parts)
+    unique_parts = list(OrderedDict.fromkeys(parts)); full_slug = "-".join(unique_parts)
     base_dir = "/".join(unique_parts)
-    return {
-        "tsv":        "{}/{}_plugin-sids.tsv".format(base_dir, full_slug),
-        "json_dict":  "{}/{}_plugin-sids.json".format(base_dir, full_slug),
-        "conf70":     "{}/70_dsiem-plugin_{}.conf".format(base_dir, full_slug),
-        "directive":  "{}/directives_{}_{}.json".format(base_dir, backend_pod, full_slug),
-        "full_slug":  full_slug
-    }
-    
+    return { "tsv": "{}/{}_plugin-sids.tsv".format(base_dir, full_slug),
+             "json_dict": "{}/{}_plugin-sids.json".format(base_dir, full_slug),
+             "conf70": "{}/70_dsiem-plugin_{}.conf".format(base_dir, full_slug),
+             "directive": "{}/directives_{}_{}.json".format(base_dir, backend_pod, full_slug),
+             "full_slug": full_slug }
 # =========================================================
-# OpenSearch (UPDATED)
+
+# =========================================================
+# OpenSearch
 # =========================================================
 def load_cred(path, user):
-    with io.open(path,"r",encoding="utf-8") as f:
-        for ln in f:
-            parts = ln.strip().split(":")
-            if len(parts) >= 2 and parts[0].strip() == user:
-                return user, ":".join(parts[1:]).strip()
-    die("[CRED] user {} tidak ditemukan di {}".format(user, path))
-
+    if not path or not user: die("[CRED] ES_PASSWD_FILE or ES_USER_LOOKUP not set.")
+    try:
+        with io.open(path,"r",encoding="utf-8") as f:
+            for ln in f:
+                parts = ln.strip().split(":")
+                if len(parts) >= 2 and parts[0].strip() == user: return user, ":".join(parts[1:]).strip()
+    except IOError as e: die("[CRED] Cannot read {}: {}".format(path, e))
+    die("[CRED] user {} not found in {}".format(user, path))
 def fetch_titles(es_cfg, q_cfg, debug=False):
     host, verify, timeout = es_cfg["host"], es_cfg.get("verify_tls", False), es_cfg.get("timeout", 3000)
     u,p = load_cred(ES_PASSWD_FILE, ES_USER_LOOKUP)
@@ -472,280 +394,284 @@ def fetch_titles(es_cfg, q_cfg, debug=False):
     index, field, size = q_cfg["index"], q_cfg["field"], int(q_cfg.get("size", 2000))
     agg_field = field if field.endswith(".keyword") else field + ".keyword"
     body={"size":0, "aggs":{"event_names":{"terms":{"field": agg_field, "size": size}}}}
-
-    # --- LOGIKA FILTER YANG DIPERBARUI ---
-    mf = [] # 'mf' adalah list untuk semua filter
-    
-    # 1. Logika untuk 'filters' (ini sudah ada di kodemu)
+    mf = []
     for f in q_cfg.get("filters", []):
-        op = f.get("op", "term")
-        field_name = f["field"]
-        value = f["value"]
-        if op == "term":
-            if not field_name.endswith(".keyword"):
-                field_name += ".keyword"
-            mf.append({"term": {field_name: value}})
-        elif op == "contains":
-            mf.append({"match_phrase": {field_name: value}})
-        else:
-            warn("Filter operation '{}' not recognized. Defaulting to 'term'.".format(op))
-            if not field_name.endswith(".keyword"):
-                field_name += ".keyword"
-            mf.append({"term": {field_name: value}})
-    
-    # 2. === TAMBAHKAN BLOK INI UNTUK MEMBACA 'time_range' ===
+        op = f.get("op", "term"); field_name = f["field"]; value = f["value"]
+        if op == "term": mf.append({"term": {(field_name if field_name.endswith(".keyword") else field_name + ".keyword"): value}})
+        elif op == "contains": mf.append({"match_phrase": {field_name: value}})
+        else: warn("Filter op '{}' unknown, using term.".format(op)); mf.append({"term": {(field_name if field_name.endswith(".keyword") else field_name + ".keyword"): value}})
     if "time_range" in q_cfg:
         time_cfg = q_cfg["time_range"]
-        try:
-            range_filter = {
-                "range": {
-                    time_cfg["field"]: {
-                        "gte": time_cfg["gte"],
-                        "lte": time_cfg["lte"]
-                    }
-                }
-            }
-            mf.append(range_filter)
-            info("Applying time_range filter: {} from {} to {}".format(time_cfg["field"], time_cfg["gte"], time_cfg["lte"]))
-        except KeyError as e:
-            warn("Konfigurasi 'time_range' tidak lengkap. Key hilang: {}. Filter waktu dibatalkan.".format(e))
-    # === AKHIR DARI BLOK TAMBAHAN ===
-            
-    # 3. Terapkan semua filter (dari 'filters' dan 'time_range') ke body query
-    if mf: 
-        body["query"]={"bool":{"filter": mf}}
-    # --- AKHIR DARI LOGIKA FILTER BARU ---
-    
+        try: mf.append({"range": {time_cfg["field"]: {"gte": time_cfg["gte"], "lte": time_cfg["lte"]}}})
+        except KeyError as e: warn("time_range incomplete (missing {}), skipped.".format(e))
+    if mf: body["query"]={"bool":{"filter": mf}}
     url = "{}/{}/_search".format(host.rstrip("/"), index)
-    
-    if debug:
-        info("Mengirim OpenSearch Query Body:\n{}".format(json.dumps(body, indent=2)))
-        
-    r = requests.post(url, auth=auth, headers={"Content-Type":"application/json"}, data=json.dumps(body), timeout=timeout, verify=verify)
-    if r.status_code != 200:
-        die("OpenSearch error {}: {}".format(r.status_code, r.text[:400]), code=3)
-    buckets = r.json().get("aggregations",{}).get("event_names",{}).get("buckets",[])
+    if debug: info("OpenSearch Query Body:\n{}".format(json.dumps(body, indent=2)))
+    try: r = requests.post(url, auth=auth, headers={"Content-Type":"application/json"}, data=json.dumps(body), timeout=timeout, verify=verify)
+    except requests.exceptions.RequestException as e: die("OpenSearch connection error: {}".format(e)); return [], "", 0
+    if r.status_code != 200: die("OpenSearch error {}: {}".format(r.status_code, r.text[:400]), code=3)
+    try: data = r.json()
+    except ValueError: die("OpenSearch response is not JSON."); return [], "", 0
+    buckets = data.get("aggregations",{}).get("event_names",{}).get("buckets",[])
     return [b.get("key","") for b in buckets if b.get("key")], agg_field, len(buckets)
 # =========================================================
-# Fungsi Distribusi & Update LOKAL
+
+# =========================================================
+# Fungsi Distribusi & Update LOKAL (Return True jika ada perubahan)
 # =========================================================
 def distribute_and_update_local(merged_rows, paths, cfg, plugin_id, template_map, template_id, args):
     section("Distribute Local Files (Kubernetes)")
+    made_local_changes = False
     logstash_json_dir = "/root/kubeappl/logstash/configs/pipelines/dsiem-events/dsiem-plugin-json/"
     json_filename = os.path.basename(paths["json_dict"])
     logstash_dest_path = os.path.join(logstash_json_dir, json_filename)
     info("Handling Logstash JSON dictionary...")
-    if not os.path.isdir(logstash_json_dir) and not args.dry_run:
-        try: os.makedirs(logstash_json_dir)
-        except OSError as e: err("Gagal membuat direktori Logstash: {}".format(e)); return
-    info("Writing JSON dictionary to {}".format(logstash_dest_path))
-    if not args.dry_run:
-        with io.open(logstash_dest_path, "w", encoding="utf-8") as f: f.write(write_json_dictionary(merged_rows))
-    info("Logstash JSON dictionary updated.")
+    new_json_content_str = write_json_dictionary(merged_rows); new_data_obj = json.loads(new_json_content_str)
+    existing_data_obj = {}
+    if os.path.exists(logstash_dest_path):
+        try:
+            with io.open(logstash_dest_path, "r", encoding="utf-8") as f_exist: existing_data_obj = json.load(f_exist)
+        except (IOError, JSONDecodeError, ValueError): warn("Failed read old JSON at {}, overwriting.".format(logstash_dest_path))
+    if new_data_obj != existing_data_obj:
+        info("JSON content differs, writing to {}".format(logstash_dest_path))
+        if not args.dry_run:
+            if not os.path.isdir(logstash_json_dir):
+                try: os.makedirs(logstash_json_dir)
+                except OSError as e: err("Failed create Logstash dir: {}".format(e)); return False
+            try:
+                with io.open(logstash_dest_path, "w", encoding="utf-8") as f:
+                    try: unicode; f.write(new_json_content_str.decode('utf-8') if isinstance(new_json_content_str, str) else new_json_content_str)
+                    except NameError: f.write(new_json_content_str)
+                    f.write(u'\n') # Add newline
+                made_local_changes = True; info("Logstash JSON dictionary updated.")
+            except IOError as e: err("Failed write JSON to {}: {}".format(logstash_dest_path, e))
+        else: info("[DRY-RUN] JSON write skipped."); made_local_changes = True
+    else: info("Logstash JSON dictionary already synced.")
     info("\nHandling dsiem-frontend directive...")
-    pod_name = "dsiem-frontend-0"
-    remote_directive_filename = os.path.basename(paths["directive"])
+    pod_name = "dsiem-frontend-0"; remote_directive_filename = os.path.basename(paths["directive"])
     remote_path_in_pod = "/dsiem/configs/{}".format(remote_directive_filename)
     local_temp_path = "./{}.temp".format(remote_directive_filename)
     info("Fetching existing directive from pod: {}...".format(pod_name))
+    # run_cmd returns return code (0 = success)
     rc = run_cmd(["kubectl", "cp", "{}:{}".format(pod_name, remote_path_in_pod), local_temp_path], dry=args.dry_run)
     existing_dir = {"directives": []}
+    # Check rc == 0 for successful kubectl cp
     if rc == 0 and os.path.exists(local_temp_path):
         try: existing_dir = read_json(local_temp_path)
-        except: warn("Gagal membaca directive JSON dari pod, akan membuat file baru.")
-    else: info("Directive file not found in pod. Assuming new plugin.")
-    
-    info("Syncing/Appending directive entries based on full TSV list...")
+        except: warn("Failed read directive JSON from pod, will create new.")
+    elif rc != 0 and not args.dry_run: # If kubectl failed (and not dry run), log warning
+         warn("Failed to copy directive from pod (kubectl rc={}). Assuming new.".format(rc))
+    else: info("Directive file not found in pod or kubectl failed. Assuming new.")
+    info("Syncing/Appending directive entries...")
     dircfg = cfg['directive']
-    updated_dir_json, appended, add_count, _ = directive_append(
-        existing_dir, template_map, template_id, plugin_id, 
-        dircfg["HEADER"], dircfg["CATEGORY"], dircfg["KINGDOM"], 
-        bool(dircfg.get("DISABLED", False)), merged_rows
-    )
-    
+    updated_dir_json, appended, add_count, _ = directive_append( existing_dir, template_map, template_id, plugin_id,
+        dircfg["HEADER"], dircfg["CATEGORY"], dircfg["KINGDOM"], bool(dircfg.get("DISABLED", False)), merged_rows )
     if appended:
         info("Found {} missing/new directives. Distributing back to pod...".format(add_count))
+        temp_write_ok = False
         if not args.dry_run:
-            with io.open(local_temp_path, "w", encoding="utf-8") as f: f.write(json.dumps(updated_dir_json, indent=2, ensure_ascii=False))
-        run_cmd(["kubectl", "cp", local_temp_path, "{}:{}".format(pod_name, remote_path_in_pod)], dry=args.dry_run)
-        info("Directive distribution complete.")
-    else: info("No new directives to add. Local file is already in sync.")
-    if os.path.exists(local_temp_path): os.remove(local_temp_path)
+            try:
+                with io.open(local_temp_path, "w", encoding="utf-8") as f:
+                    json_str_directive = json.dumps(updated_dir_json, indent=2, ensure_ascii=False)
+                    try: unicode; f.write(json_str_directive.decode('utf-8') if isinstance(json_str_directive, str) else json_str_directive)
+                    except NameError: f.write(json_str_directive)
+                    f.write(u'\n') # Add newline
+                temp_write_ok = True
+            except IOError as e: err("Failed write temp directive {}: {}".format(local_temp_path, e))
+        else: info("[DRY-RUN] Temp directive write skipped."); temp_write_ok = True
+        if temp_write_ok:
+            # run_cmd returns return code (0 = success)
+            if run_cmd(["kubectl", "cp", local_temp_path, "{}:{}".format(pod_name, remote_path_in_pod)], dry=args.dry_run) == 0:
+                 made_local_changes = True; info("Directive distribution complete.")
+            else: err("Failed copy directive to pod.")
+    else: info("No new directives to add. Local directive already synced.")
+    if os.path.exists(local_temp_path) and not args.dry_run:
+        try: os.remove(local_temp_path)
+        except OSError as e: warn("Failed remove temp file {}: {}".format(local_temp_path, e))
+    return made_local_changes
+# =========================================================
 
 # =========================================================
-# CLI & MAIN (PERBAIKAN)
+# CLI & MAIN
 # =========================================================
 def parse_args():
-    ap = argparse.ArgumentParser(description="auto-update full-sync")
-    ap.add_argument("--dry-run", action="store_true", help="simulate everything")
-    ap.add_argument("--debug", action="store_true", help="extra debug logs")
+    ap = argparse.ArgumentParser(description="Auto-update SIEM event dictionary & directives.")
+    ap.add_argument("--dry-run", action="store_true", help="Simulate without pushing or distributing.")
+    ap.add_argument("--debug", action="store_true", help="Enable extra debug logging (e.g., query bodies).")
     return ap.parse_args()
 
 def main():
     args = parse_args()
     section("Load config")
-    cfg = read_json(CFG_PATH)
+    try: cfg = read_json(CFG_PATH)
+    except (FileNotFoundError, IOError): die("Config file '{}' not found.".format(CFG_PATH)); return 1 # Exit if config missing
+    except (JSONDecodeError, ValueError): die("Config file '{}' is not valid JSON.".format(CFG_PATH)); return 1
 
-    # 1. Muat file konfigurasi customer
     customer_path = cfg.get("customer_config_path", "./customer.json")
     info("Loading customer config from: {}".format(customer_path))
-    try:
-        customer_cfg = read_json(customer_path)
-        cfg.update(customer_cfg)
-    except FileNotFoundError:
-        warn("Customer config file not found at '{}'. Using default values.".format(customer_path))
-    except (JSONDecodeError, ValueError): # <-- Menggunakan variabel kompatibel
-        err("Error decoding JSON from '{}'. Please check its format.".format(customer_path))
+    try: customer_cfg = read_json(customer_path); cfg.update(customer_cfg)
+    except FileNotFoundError: warn("Customer config '{}' not found.".format(customer_path))
+    except (JSONDecodeError, ValueError): err("Error decoding customer JSON '{}'.".format(customer_path))
+    info("Email config loading from env vars.")
 
-    # 2. BLOK BACA 'email.json' DIHAPUS
-    # Konfigurasi email sekarang murni dari environment variable
-    info("Email config will be loaded from environment variables (config.sh).")
-    
+    # Validate essential config sections
+    required_keys = ["es", "query", "layout", "file70", "directive", "github"]
+    if not all(k in cfg for k in required_keys):
+        missing = [k for k in required_keys if k not in cfg]
+        die("Config file '{}' is missing required sections: {}".format(CFG_PATH, ", ".join(missing)))
+        return 1
+        
     es_cfg, q_cfg, layout, file70, dircfg, gh_cfg = cfg["es"], cfg["query"], cfg["layout"], cfg["file70"], cfg["directive"], cfg["github"]
+
+    if not GITHUB_TOKEN: die("GITHUB_TOKEN env var not set.", code=2)
+
+    try: paths = gh_paths(layout["device"], layout["module"], layout.get("submodule"), layout.get("filter_key"))
+    except KeyError as e: die("Layout section missing key: {}".format(e)); return 1
+    try: plugin_id = int(file70["plugin_id"])
+    except (KeyError, ValueError): die("file70 section missing or invalid 'plugin_id'."); return 1
     
-    gh_token = GITHUB_TOKEN
-    if not gh_token:
-        die("Environment variable GITHUB_TOKEN belum di-set atau kosong. Harap jalankan 'source config.sh' terlebih dahulu.", code=2)
-    
-    paths = gh_paths(layout["device"], layout["module"], layout.get("submodule"), layout.get("filter_key"))
-    siem_plugin_type, plugin_id = paths["full_slug"], int(file70["plugin_id"])
+    siem_plugin_type = paths["full_slug"]
     category, kingdom, disabled, template_id = dircfg.get("CATEGORY"), dircfg.get("KINGDOM"), bool(dircfg.get("DISABLED")), dircfg.get("template_id")
-    
-    # --- [ INI BAGIAN YANG DIUBAH ] ---
-    env_repo = os.getenv("GITHUB_REPO")
-    env_branch = os.getenv("GITHUB_BRANCH")
-    gh_repo = env_repo if env_repo else gh_cfg["repo"]
-    gh_branch = env_branch if env_branch else gh_cfg.get("branch", "main")
-    template70_path = gh_cfg.get("template_path", "./template-70.js")
-    registry_path = gh_cfg.get("plugin_registry_path", "plugin_id.json") 
+    if not template_id: die("Directive section missing 'template_id'."); return 1
 
-    if env_repo:
-        info("Using GITHUB_REPO from environment: {}".format(gh_repo))
-    else:
-        info("Using GITHUB_REPO from config file: {}".format(gh_repo))
-    # --- [ AKHIR BAGIAN YANG DIUBAH ] ---
+    env_repo = os.getenv("GITHUB_REPO"); env_branch = os.getenv("GITHUB_BRANCH")
+    gh_repo = env_repo if env_repo else gh_cfg.get("repo") # Fallback to JSON (should be removed)
+    gh_branch = env_branch if env_branch else gh_cfg.get("branch", "main") # Fallback to JSON (should be removed)
+    template70_path = gh_cfg.get("template_path", "./template-70.js") # Default if missing
+    registry_path = gh_cfg.get("plugin_registry_path", "plugin_id.json") # Default if missing
 
+    if not gh_repo: die("GitHub repo not defined in env var or config JSON."); return 1
+
+    info("Using GITHUB_REPO: {}".format(gh_repo))
     info("CFG: {}, Repo: {}@{}, Slug: {}".format(CFG_PATH, gh_repo, gh_branch, siem_plugin_type))
-    
+
     section("Check Plugin ID Registry")
-    reg_obj, reg_sha = gh_get(gh_repo, gh_branch, gh_token, registry_path, debug=args.debug)
+    reg_obj, _ = gh_get(gh_repo, gh_branch, GITHUB_TOKEN, registry_path, debug=args.debug)
     registry, found_in_reg = {}, False
-    if reg_obj: registry = json.loads(base64.b64decode(reg_obj.get("content","")).decode("utf-8"))
+    reg_sha = None # Initialize reg_sha
+    if reg_obj:
+        reg_sha = reg_obj.get("sha") # Get sha for potential update
+        try: registry = json.loads(base64.b64decode(reg_obj.get("content","")).decode("utf-8"))
+        except (TypeError, ValueError, base64.binascii.Error): warn("Failed parse plugin registry from GitHub.")
+    if not isinstance(registry.get("used"), list): registry["used"] = [] # Ensure 'used' is a list
     for item in registry.get("used", []):
         if item.get("siem_plugin_type") == siem_plugin_type:
-            if int(item.get("plugin_id")) == plugin_id: info("Plugin ID {} untuk '{}' sudah terdaftar. OK.".format(plugin_id, siem_plugin_type)); found_in_reg = True; break
-            else: die("Konflik! Slug '{}' terdaftar dengan ID {}, tapi config memakai {}.".format(siem_plugin_type, item.get("plugin_id"), plugin_id))
+            try: reg_pid = int(item.get("plugin_id"))
+            except (ValueError, TypeError): continue
+            if reg_pid == plugin_id: found_in_reg = True; info("Plugin ID {} OK.".format(plugin_id)); break
+            else: die("Conflict! Slug '{}' uses ID {}, but registry has {}.".format(siem_plugin_type, plugin_id, reg_pid))
+    if not found_in_reg and not args.dry_run:
+        # Auto-register if not found and not dry run
+        section("Auto-registering Plugin ID")
+        registry["used"].append({"plugin_id": plugin_id, "siem_plugin_type": siem_plugin_type, "by": layout.get("device", "unknown")})
+        registry["used"] = sorted(registry["used"], key=lambda x: x.get("plugin_id", 0))
+        gh_put(gh_repo, gh_branch, GITHUB_TOKEN, registry_path, json.dumps(registry, indent=2).encode("utf-8"),
+               "[auto] Register plugin_id {} for {}".format(plugin_id, siem_plugin_type), sha=reg_sha, debug=args.debug, dry=args.dry_run)
+        info("Plugin Registry push: OK")
+        found_in_reg = True # Mark as found now
+    elif not found_in_reg and args.dry_run:
+         info("[DRY-RUN] Plugin ID {} would be registered.".format(plugin_id))
+         found_in_reg = True # Simulate registration for dry run
 
     section("OpenSearch aggregation")
-    titles, agg_field_used, bucket_count = fetch_titles(es_cfg, q_cfg, debug=args.debug)
-    info("Agg field used: '{}'".format(agg_field_used))
-    info("Buckets found: {}".format(bucket_count))
-    info("Titles (sample 5): {}".format(titles[:5]))
+    titles, _, _ = fetch_titles(es_cfg, q_cfg, debug=args.debug)
 
     section("Fetch & Merge TSV from GitHub")
-    tsv_obj, _ = gh_get(gh_repo, gh_branch, gh_token, paths["tsv"], debug=args.debug)
+    tsv_obj, _ = gh_get(gh_repo, gh_branch, GITHUB_TOKEN, paths["tsv"], debug=args.debug)
     existing_rows, tsv_sha = [], None
     if tsv_obj:
         tsv_sha = tsv_obj.get("sha")
-        content = base64.b64decode(tsv_obj.get("content", "")).decode("utf-8")
+        try: content = base64.b64decode(tsv_obj.get("content", "")).decode("utf-8")
+        except (TypeError, base64.binascii.Error): content = ""; warn("Failed decode TSV from GitHub.")
         existing_rows, _ = tsv_parse(content)
         info("TSV exists (sha={}), rows={}".format(tsv_sha, len(existing_rows)))
-    else:
-        info("TSV not found (new file).")
+    else: info("TSV not found (new file).")
     merged_rows, added_rows, _ = tsv_merge(existing_rows, titles)
-    info("Total rows after merge: {}, New titles from OpenSearch: {}".format(len(merged_rows), len(added_rows)))
+    info("Total rows: {}, New events: {}".format(len(merged_rows), len(added_rows)))
 
-    # --- PANGGIL FUNGSI EMAIL DI SINI (PERBAIKAN) ---
     if added_rows:
         is_active_plugin = False
         active_plugins_file = './active_plugins.json'
         if os.path.exists(active_plugins_file):
             try:
-                with open(active_plugins_file, 'r') as f:
-                    active_list = json.load(f)
-                if siem_plugin_type in active_list:
-                    is_active_plugin = True
-                    info("Plugin '{}' is marked as ACTIVE. Email notification will be sent.".format(siem_plugin_type))
-                else:
-                    info("Plugin '{}' is PASSIVE. Skipping email notification.".format(siem_plugin_type))
-            except (IOError, JSONDecodeError, ValueError) as e: # <-- Menggunakan var kompatibel
-                warn("Could not read or parse active_plugins.json: {}. Assuming PASSIVE.".format(e))
-        else:
-            info("active_plugins.json not found. Assuming all plugins are PASSIVE.")
-
-        # Email hanya dikirim jika ada baris baru DAN plugin ini aktif
-        # Pengecekan 'enabled' sekarang ada di dalam 'send_notification_email'
+                # Use io.open here too
+                with io.open(active_plugins_file, 'r', encoding='utf-8') as f: active_list = json.load(f)
+                if isinstance(active_list, list) and siem_plugin_type in active_list:
+                    is_active_plugin = True; info("Plugin ACTIVE. Email will be sent.")
+                else: info("Plugin PASSIVE. Skipping email.")
+            except (IOError, JSONDecodeError, ValueError): warn("Cannot parse active_plugins.json. Assuming PASSIVE.")
+        else: info("active_plugins.json not found. Assuming PASSIVE.")
         if is_active_plugin:
-            customer_name = "Default Customer"
-            customer_info = cfg.get("customer_info", {})
-            customer_name = customer_info.get("customer_name", customer_name)
-            
-            # Panggil fungsi TANPA 'email_cfg'
+            customer_name = cfg.get("customer_info", {}).get("customer_name", "Default")
             send_notification_email(customer_name, dircfg.get("HEADER", paths["full_slug"]), added_rows)
-    # --- AKHIR DARI PEMANGGILAN EMAIL ---
-    
+
     if added_rows or not tsv_obj:
-        gh_put(gh_repo, gh_branch, gh_token, paths["tsv"], tsv_render(merged_rows, siem_plugin_type, plugin_id, category, kingdom).encode("utf-8"),
+        gh_put(gh_repo, gh_branch, GITHUB_TOKEN, paths["tsv"], tsv_render(merged_rows, siem_plugin_type, plugin_id, category, kingdom).encode("utf-8"),
                "[auto] Update TSV for {}".format(siem_plugin_type), sha=tsv_sha, debug=args.debug, dry=args.dry_run)
         info("TSV push: OK")
-    
+
     section("Sync GitHub JSON Dictionary")
-    json_obj, _ = gh_get(gh_repo, gh_branch, gh_token, paths["json_dict"], debug=args.debug)
-    new_json_content_str = write_json_dictionary(merged_rows)
-    new_data_obj = json.loads(new_json_content_str)
+    json_obj, _ = gh_get(gh_repo, gh_branch, GITHUB_TOKEN, paths["json_dict"], debug=args.debug)
+    new_json_content_str = write_json_dictionary(merged_rows); new_data_obj = json.loads(new_json_content_str)
     existing_data_obj = {}
     if json_obj and json_obj.get("content"):
         try:
             existing_json_content_str = base64.b64decode(json_obj.get("content", "")).decode("utf-8")
             existing_data_obj = json.loads(existing_json_content_str)
-        except (JSONDecodeError, TypeError, ValueError):
-            warn("Gagal mem-parsing konten JSON dari GitHub. Akan dianggap sebagai perubahan.")
+        except (JSONDecodeError, TypeError, ValueError, base64.binascii.Error): warn("Failed parse GitHub JSON dict.")
     if new_data_obj != existing_data_obj:
-        info("Konten JSON berbeda. Melakukan push sinkronisasi penuh ke GitHub...")
-        gh_put(gh_repo, gh_branch, gh_token, paths["json_dict"], new_json_content_str.encode("utf-8"),
-               "[auto] Sync JSON dictionary for {}".format(siem_plugin_type), sha=json_obj.get("sha") if json_obj else None, debug=args.debug, dry=args.dry_run)
-        info("JSON Dict push: OK (Konten disinkronkan)")
-    else:
-        info("JSON Dict sudah sinkron dengan data TSV. Tidak ada perubahan.")
+        info("JSON dict differs. Pushing sync...")
+        gh_put(gh_repo, gh_branch, GITHUB_TOKEN, paths["json_dict"], new_json_content_str.encode("utf-8"),
+               "[auto] Sync JSON dict for {}".format(siem_plugin_type), sha=json_obj.get("sha") if json_obj else None, debug=args.debug, dry=args.dry_run)
+        info("JSON Dict push: OK")
+    else: info("JSON Dict already synced.")
 
-    section("Update 70.conf (Template-based)")
-    conf70_obj, _ = gh_get(gh_repo, gh_branch, gh_token, paths["conf70"], debug=args.debug)
+    section("Update 70.conf (if missing)")
+    conf70_obj, _ = gh_get(gh_repo, gh_branch, GITHUB_TOKEN, paths["conf70"], debug=args.debug)
     if not conf70_obj:
-        json_path_on_server = "/etc/logstash/pipelines/dsiem-events/dsiem-plugin-json/{}_plugin-sids.json".format(siem_plugin_type)
-        conf70_text = generate_conf70_from_template(template70_path, plugin_id, layout["device"], siem_plugin_type, q_cfg["field"].replace(".keyword", ""), category, json_path_on_server)
-        gh_put(gh_repo, gh_branch, gh_token, paths["conf70"], conf70_text.encode("utf-8"),
+        info("70.conf missing on GitHub. Generating and pushing...")
+        # Path on server where Logstash reads the JSON
+        json_path_on_server = "/root/kubeappl/logstash/configs/pipelines/dsiem-events/dsiem-plugin-json/{}_plugin-sids.json".format(siem_plugin_type)
+        # Use field without .keyword for template {field} placeholder
+        field_no_keyword = q_cfg["field"].replace(".keyword", "")
+        conf70_text = generate_conf70_from_template(template70_path, plugin_id, layout["device"], siem_plugin_type, field_no_keyword, category, json_path_on_server)
+        gh_put(gh_repo, gh_branch, GITHUB_TOKEN, paths["conf70"], conf70_text.encode("utf-8"),
                "[auto] Create 70.conf for {}".format(siem_plugin_type), sha=None, debug=args.debug, dry=args.dry_run)
         info("70.conf push: CREATED")
-    
+    else: info("70.conf already exists on GitHub.")
+
     section("Sync GitHub Directives")
     template_map = load_directive_templates("./directive_rules.json")
-    dir_obj, _ = gh_get(gh_repo, gh_branch, gh_token, paths["directive"], debug=args.debug)
-    existing_dir, dir_sha = ({"directives":[]}, None) if not dir_obj else (json.loads(base64.b64decode(dir_obj.get("content","")).decode("utf-8")), dir_obj.get("sha"))
+    dir_obj, _ = gh_get(gh_repo, gh_branch, GITHUB_TOKEN, paths["directive"], debug=args.debug)
+    existing_dir, dir_sha = ({"directives":[]}, None)
+    if dir_obj:
+        dir_sha = dir_obj.get("sha")
+        try: existing_dir = json.loads(base64.b64decode(dir_obj.get("content","")).decode("utf-8"))
+        except (JSONDecodeError, ValueError, TypeError, base64.binascii.Error): warn("Failed parse GitHub directives JSON.")
+    if not isinstance(existing_dir.get("directives"), list): existing_dir["directives"] = [] # Ensure structure
+
     updated_dir_json, appended, add_count, _ = directive_append(existing_dir, template_map, template_id, plugin_id, dircfg["HEADER"], category, kingdom, disabled, merged_rows)
     if appended:
-        info("Directive content mismatch. Found {} missing/new entries. Pushing full sync to GitHub...".format(add_count))
-        gh_put(gh_repo, gh_branch, gh_token, paths["directive"], json.dumps(updated_dir_json, indent=2, ensure_ascii=False).encode("utf-8"),
+        info("Directives differ ({} new). Pushing sync...".format(add_count))
+        gh_put(gh_repo, gh_branch, GITHUB_TOKEN, paths["directive"], json.dumps(updated_dir_json, indent=2, ensure_ascii=False).encode("utf-8"),
                "[auto] Sync directives for {}".format(siem_plugin_type), sha=dir_sha, debug=args.debug, dry=args.dry_run)
-        info("Directives push: Synced {} entries".format(add_count))
-    else:
-        info("Directives are already in sync with TSV.")
+        info("Directives push: OK")
+    else: info("Directives already synced.")
 
-    if not found_in_reg:
-        section("Update Plugin ID Registry")
-        if "used" not in registry: registry["used"] = []
-        registry["used"].append({"plugin_id": plugin_id, "siem_plugin_type": siem_plugin_type, "by": layout["device"]})
-        registry["used"] = sorted(registry["used"], key=lambda x: x.get("plugin_id", 0))
-        gh_put(gh_repo, gh_branch, gh_token, registry_path, json.dumps(registry, indent=2).encode("utf-8"),
-               "[auto] Register plugin_id {} for {}".format(plugin_id, siem_plugin_type), sha=reg_sha, debug=args.debug, dry=args.dry_run)
-        info("Plugin Registry push: OK")
-
-    distribute_and_update_local(merged_rows, paths, cfg, plugin_id, template_map, template_id, args)
+    # Call distribute_and_update_local AFTER GitHub updates
+    made_local_changes = distribute_and_update_local(merged_rows, paths, cfg, plugin_id, template_map, template_id, args)
 
     section("Summary")
     info("DONE.")
-    return 0
+    if made_local_changes:
+        info("Local changes detected, signaling for restart.")
+        return 5 # Exit code for restart needed
+    else:
+        return 0 # Normal exit
 
 if __name__ == "__main__":
-    try: sys.exit(main())
-    except Exception as e:
-        err("Unexpected error: {}".format(e)); traceback.print_exc(); sys.exit(99)
+    exit_code = 99
+    try: exit_code = main()
+    except SystemExit as e: exit_code = e.code if isinstance(e.code, int) else 1 # Ensure integer exit code
+    except Exception as e: err("Unexpected error: {}".format(e)); traceback.print_exc()
+    finally: sys.exit(exit_code)
