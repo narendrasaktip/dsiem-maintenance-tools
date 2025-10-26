@@ -27,7 +27,7 @@ except Exception:
 from requests.auth import HTTPBasicAuth
 
 # ====== CONFIG ENV ======
-ES_HOST = os.getenv("ES_HOST", "http://opensearch:9200")
+ES_HOST = os.getenv("ES_HOST")
 VERIFY_TLS = os.getenv("VERIFY_TLS", "false").lower() == "true"
 TIMEOUT = int(os.getenv("TIMEOUT", "3000"))
 PLUGIN_SID_START = int(os.getenv("PLUGIN_SID_START", "1"))
@@ -44,7 +44,7 @@ META_PATH = os.getenv("META_PATH", "./build_meta.json")
 DICT_REFRESH_INTERVAL = int(os.getenv("DICT_REFRESH_INTERVAL", "60"))  # seconds
 
 # Directory for Logstash JSON dictionaries
-LOGSTASH_JSON_DICT_DIR = "/etc/logstash/pipelines/dsiem-events/dsiem-plugin-json/"
+LOGSTASH_JSON_DICT_DIR = os.getenv("LOGSTASH_JSON_DICT_DIR")
 
 
 # GitHub API (Contents API)
@@ -56,8 +56,8 @@ AUTO_USE_CONFIG = os.getenv("AUTO_USE_CONFIG", "0") == "1"
 PLUGIN_REGISTRY_PATH = "plugin_id.json"
 
 # Distribusi & restart
-LOGSTASH_PIPE_DIR = "/root/kubeappl/logstash/configs/pipelines/dsiem-events/"
-LOGSTASH_HOME     = "/root/kubeappl/logstash/"
+LOGSTASH_PIPE_DIR = os.getenv("LOGSTASH_PIPE_DIR")
+LOGSTASH_HOME     = os.getenv("LOGSTASH_HOME")
 FRONTEND_POD      = "dsiem-frontend-0"
 BACKEND_POD       = "dsiem-backend-0"
 
@@ -433,6 +433,7 @@ def generate_updater_config(output_path, context):
             ("module", context.get("module_slug")),
             ("submodule", context.get("submodule_slug")),
             ("filter_key", context.get("filter1_slug"))
+            ("needs_distribution", True)
         ])),
         ("file70", OrderedDict([
             ("plugin_id", context.get("plugin_id_final"))

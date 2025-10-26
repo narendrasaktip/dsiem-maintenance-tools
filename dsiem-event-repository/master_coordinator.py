@@ -11,7 +11,7 @@ JOBS_FILE = 'master_jobs.json'
 UPDATER_SCRIPT = 'auto-updated.py'
 
 # Konfigurasi Restart (sesuaikan jika perlu)
-LOGSTASH_HOME = "/root/kubeappl/logstash/"
+LOGSTASH_HOME     = os.getenv("LOGSTASH_HOME")
 BACKEND_POD = "dsiem-backend-0"
 FRONTEND_POD = "dsiem-frontend-0"
 

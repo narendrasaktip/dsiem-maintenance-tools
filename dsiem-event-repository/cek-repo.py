@@ -17,12 +17,12 @@ OUT_DIR = os.getenv("OUT_DIR", "./pulled_configs")
 
 # ====== KONFIGURASI DISTRIBUSI & RESTART ======
 # --- Logstash ---
-LOGSTASH_PIPE_DIR = "/root/kubeappl/logstash/configs/pipelines/dsiem-events/"
-LOGSTASH_JSON_DICT_DIR = "/root/kubeappl/logstash/configs/pipelines/dsiem-events/dsiem-plugin-json/"
-LOGSTASH_HOME     = "/root/kubeappl/logstash/"
+LOGSTASH_PIPE_DIR = os.getenv("LOGSTASH_PIPE_DIR")
+LOGSTASH_JSON_DICT_DIR = os.getenv("LOGSTASH_JSON_DICT_DIR")
+LOGSTASH_HOME     = os.getenv("LOGSTASH_HOME")
 # --- Vector ---
-VECTOR_CONFIG_BASE_DIR = "/root/data/mgmt/kubeappl/vector-parser/configs/"
-NFS_BASE_DIR           = "/root/data/nfs/"
+VECTOR_CONFIG_BASE_DIR = os.getenv("VECTOR_CONFIG_BASE_DIR")
+NFS_BASE_DIR           = os.getenv("NFS_BASE_DIR")
 # --- Kubernetes ---
 FRONTEND_POD      = "dsiem-frontend-0"
 BACKEND_POD       = "dsiem-backend-0"
