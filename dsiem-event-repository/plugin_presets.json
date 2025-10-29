@@ -1,0 +1,1542 @@
+{
+  "Microsoft 365 - Azure Active Directory": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "AzureActiveDirectory",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40600
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Azure Active Directory",
+      "CATEGORY": "Valid Accounts",
+      "KINGDOM": "Initial Access",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "AzureActiveDirectory",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Exchange": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "Exchange",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40601
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Exchange",
+      "CATEGORY": "Email Collection",
+      "KINGDOM": "Collection",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "Exchange",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - SharePoint": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "SharePoint",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40602
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - SharePoint",
+      "CATEGORY": "Exfiltration to Cloud Storage",
+      "KINGDOM": "Exfiltration",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "SharePoint",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - OneDrive": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "OneDrive",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40603
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - OneDrive",
+      "CATEGORY": "Exfiltration to Cloud Storage",
+      "KINGDOM": "Exfiltration",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "OneDrive",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Microsoft Teams": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "MicrosoftTeams",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40604
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Microsoft Teams",
+      "CATEGORY": "Application Layer Protocol",
+      "KINGDOM": "Command and Control",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "MicrosoftTeams",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Public Endpoint": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "PublicEndpoint",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40605
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Public Endpoint",
+      "CATEGORY": "Exploit Public-Facing Application",
+      "KINGDOM": "Initial Access",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "PublicEndpoint",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Microsoft Forms": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "MicrosoftForms",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40606
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Microsoft Forms",
+      "CATEGORY": "Form-Based Data Collection",
+      "KINGDOM": "Collection",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "MicrosoftForms",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Power Platform": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "PowerPlatform",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40607
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Power Platform",
+      "CATEGORY": "Abuse of Trusted Developer Utilities",
+      "KINGDOM": "Defense Evasion",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "PowerPlatform",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Planner": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "Planner",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40608
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Planner",
+      "CATEGORY": "Data Manipulation",
+      "KINGDOM": "Impact",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "Planner",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Endpoint": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "Endpoint",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40609
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Endpoint",
+      "CATEGORY": "System Information Discovery",
+      "KINGDOM": "Discovery",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "Endpoint",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Aip": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "Aip",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40610
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Aip",
+      "CATEGORY": "Disable or Modify Tools",
+      "KINGDOM": "Defense Evasion",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "Aip",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Microsoft To do": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "MicrosoftTodo",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40611
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Microsoft To do",
+      "CATEGORY": "Automated Collection",
+      "KINGDOM": "Collection",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "MicrosoftTodo",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Copilot": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "Copilot",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40612
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Copilot",
+      "CATEGORY": "Data from Information Repositories",
+      "KINGDOM": "Collection",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "Copilot",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Security Compliance Center": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "SecurityComplianceCenter",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40613
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Security Compliance Center",
+      "CATEGORY": "Modify Account Permissions",
+      "KINGDOM": "Privilege Escalation",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "SecurityComplianceCenter",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Attack Simulation": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "AttackSimulation",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40614
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Attack Simulation",
+      "CATEGORY": "Phishing",
+      "KINGDOM": "Initial Access",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "AttackSimulation",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Compliance Posture Management": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "CompliancePostureManagement",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40615
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Compliance Posture Management",
+      "CATEGORY": "Permission Groups Discovery",
+      "KINGDOM": "Discovery",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "CompliancePostureManagement",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Threat Intelligence": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "ThreatIntelligence",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40616
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Threat Intelligence",
+      "CATEGORY": "Gather Victim Org Information",
+      "KINGDOM": "Reconnaissance",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "ThreatIntelligence",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Microsoft Flow": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "MicrosoftFlow",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40617
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Microsoft Flow",
+      "CATEGORY": "Cloud Service Account",
+      "KINGDOM": "Persistence",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "MicrosoftFlow",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Power BI": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "PowerBI",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40618
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Power BI",
+      "CATEGORY": "Data from Information Repositories",
+      "KINGDOM": "Collection",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "PowerBI",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Project For The Web": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "ProjectForTheWeb",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40619
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Project For The Web",
+      "CATEGORY": "Data from Information Repositories",
+      "KINGDOM": "Collection",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "ProjectForTheWeb",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Yammer": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "Yammer",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40620
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Yammer",
+      "CATEGORY": "Data from Information Repositories",
+      "KINGDOM": "Collection",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "Yammer",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Air Investigation": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "AirInvestigation",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40621
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Air Investigation",
+      "CATEGORY": "Impair Defenses",
+      "KINGDOM": "Defense Evasion",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "AirInvestigation",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Quarantine": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "Quarantine",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40622
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Quarantine",
+      "CATEGORY": "Hide Artifacts",
+      "KINGDOM": "Defense Evasion",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "Quarantine",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Microsoft Places": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "MicrosoftPlaces",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40623
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Microsoft Places",
+      "CATEGORY": "Location Information Discovery",
+      "KINGDOM": "Collection",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "MicrosoftPlaces",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Mip": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "Mip",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40624
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Mip",
+      "CATEGORY": "Disable Security Tools",
+      "KINGDOM": "Defense Evasion",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "Mip",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Mesh": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "Mesh",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40625
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Mesh",
+      "CATEGORY": "Application Layer Protocol",
+      "KINGDOM": "Command and Control",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "Mesh",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Dlp Sensitive Information Type": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "DlpSensitiveInformationType",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40626
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Dlp Sensitive Information Type",
+      "CATEGORY": "Exfiltration Over Web Service",
+      "KINGDOM": "Exfiltration",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "DlpSensitiveInformationType",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Microsoft 365 - Security Compliance RBAC": {
+    "creator": {
+      "device_name": "microsoft365",
+      "index_pattern": "office365",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "event.Workload",
+          "value": "SecurityComplianceRBAC",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40627
+    },
+    "directive": {
+      "HEADER": "Microsoft 365 - Security Compliance RBAC",
+      "CATEGORY": "Modify Account Permissions",
+      "KINGDOM": "Privilege Escalation",
+      "generate_directive": "y",
+      "template_id": "Critical Alert (Raise on Stage 1)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "h",
+      "sensor_value": "SecurityComplianceRBAC",
+      "product_mode": "h",
+      "product_value": "Microsoft 365",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Source User",
+      "custom_data1": "source_user",
+      "custom_label2": "Target User",
+      "custom_data2": "target_user",
+      "custom_label3": "Source Country",
+      "custom_data3": "source_country",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  }
+}
