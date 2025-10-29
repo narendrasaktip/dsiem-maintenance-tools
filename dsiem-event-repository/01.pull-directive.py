@@ -222,7 +222,7 @@ def find_plugins_in_parent(parent_path, current_path=""):
 
     # Kondisi plugin: ada config.json DAN tidak ada subdirektori lagi
     # Juga pastikan path yang dicek bukan parent awalnya (jika current_path kosong)
-    if has_config and not has_subdirs and current_path: # Hanya tambahkan jika bukan parent itu sendiri
+    if has_config and not has_subdirs: # Hanya tambahkan jika bukan parent itu sendiri
         found_plugins.append(full_path)
 
     # Lakukan rekursi ke subdirektori
