@@ -363,35 +363,82 @@ def get_valid_input(prompt, validation_type):
 
 # --- Modified Update/Delete/Toggle Functions (operate on CURRENT_FILE_INFO) ---
 def update_current_file_data(mode, new_prio, new_dis, ids_to_update=None):
+    """Modifies CURRENT_FILE_INFO content_str based on mode and selection."""
     print_loading("Updating directives in memory...")
-    try: data = json.loads(CURRENT_FILE_INFO['content_str'], object_pairs_hook=collections.OrderedDict); structure = "array" if "directives" in data else "single_object"
-    except (ValueError, JSONDecodeError): print_error("Cannot parse current file content as JSON."); return False, 0
-    updated_items_count = 0; updated_items_details = []
+
+    try:
+        # Load the current data from the string state
+        data = json.loads(CURRENT_FILE_INFO['content_str'], object_pairs_hook=collections.OrderedDict)
+        structure = "array" if "directives" in data else "single_object"
+    except (ValueError, JSONDecodeError):
+        print_error("Cannot parse current file content as JSON.")
+        return False, 0 # Failed, 0 updated
+
+    updated_items_count = 0
+    updated_items_details = []
+
+    # --- Apply modifications to the 'data' object ---
     if structure == "single_object":
         item_updated = False
+        # Apply changes directly to 'data'
         if mode in ["priority", "both"] and new_prio is not None: data['priority'] = new_prio; item_updated = True
         if mode in ["disabled", "both", "set_all_status"] and new_dis is not None: data['disabled'] = new_dis; item_updated = True
-        if item_updated: updated_items_count = 1; updated_items_details.append(data)
+        if item_updated:
+            updated_items_count = 1
+            updated_items_details.append(data)
     elif structure == "array" and ids_to_update is not None:
         ids_set = set(int(i) for i in ids_to_update)
         for directive in data.get("directives", []):
-            dir_id = directive.get('id'); item_updated = False
+            dir_id = directive.get('id')
+            item_updated = False
             if dir_id is not None and int(dir_id) in ids_set:
+                # Apply changes directly to the 'directive' dict within 'data'
                 if mode in ["priority", "both"] and new_prio is not None: directive['priority'] = new_prio; item_updated = True
                 if mode in ["both", "set_all_status"] and new_dis is not None: directive['disabled'] = new_dis; item_updated = True
-                if item_updated: updated_items_count += 1; updated_items_details.append(directive)
+                if item_updated:
+                    updated_items_count += 1
+                    updated_items_details.append(directive)
+    # --- End applying modifications ---
+
     if updated_items_count > 0:
         try:
-            output = io.StringIO(); json.dump(data, output, indent=4, ensure_ascii=False); new_content_str = output.getvalue(); output.close()
-            try: unicode; CURRENT_FILE_INFO['content_str'] = new_content_str.decode('utf-8') if isinstance(new_content_str, str) else new_content_str
-            except NameError: CURRENT_FILE_INFO['content_str'] = new_content_str
-            CURRENT_FILE_INFO['modified'] = True; print_success("Update SUCCESSFUL for {} item(s) in memory.".format(updated_items_count))
+            # --- [CORRECTED SERIALIZATION BLOCK] ---
+            # 1. Use json.dumps directly to get the string
+            #    Py2 -> str (bytes, utf-8)
+            #    Py3 -> str (unicode)
+            json_string = json.dumps(data, indent=4, ensure_ascii=False)
+
+            # 2. Check if we are in Python 2 and need to decode
+            try:
+                unicode # Attempt to access 'unicode', fails in Py3
+                # If we are in Py2 and the result is bytes (str), decode to unicode
+                if isinstance(json_string, str):
+                    json_string = json_string.decode('utf-8')
+            except NameError:
+                # This is Py3, json_string is already unicode (str)
+                pass
+
+            # 3. Store the guaranteed unicode string back into the state
+            CURRENT_FILE_INFO['content_str'] = json_string
+            CURRENT_FILE_INFO['modified'] = True
+            # --- [END CORRECTED SERIALIZATION BLOCK] ---
+
+            print_success("Update SUCCESSFUL for {} item(s) in memory.".format(updated_items_count))
+            # Display update details (unchanged)
             if mode != "toggle_status" and updated_items_details:
                 print("\n{}Check new values:{}".format(TColors.BOLD+TColors.CYAN, TColors.RESET))
-                for item in updated_items_details: print_data = {"id": item.get('id'), "name": item.get('name'), "priority": item.get('priority'), "disabled": item.get('disabled')}; print("{}{}{}".format(TColors.DIM, json.dumps(print_data, indent=2, sort_keys=True), TColors.RESET))
+                for item in updated_items_details:
+                    print_data = {"id": item.get('id'), "name": item.get('name'), "priority": item.get('priority'), "disabled": item.get('disabled')}
+                    print("{}{}{}".format(TColors.DIM, json.dumps(print_data, indent=2, sort_keys=True), TColors.RESET))
             return True, updated_items_count
-        except Exception as e: print_error("Failed to serialize updated JSON: {}".format(e)); return False, 0
-    else: print_warning("No items matched criteria for update."); return True, 0
+        except Exception as e:
+            # Catch potential errors during dumps or decode
+            print_error("Failed to serialize or process updated JSON: {}".format(e))
+            return False, 0
+    else:
+        # No items matched, but the process didn't fail
+        print_warning("No items matched the criteria for update.")
+        return True, 0 # Considered success
 
 def delete_directives_from_current_file(ids_to_delete):
     print_loading("Deleting directives in memory...")
@@ -411,27 +458,74 @@ def delete_directives_from_current_file(ids_to_delete):
     else: print_warning("No matching directives found to delete."); return True
 
 def toggle_directives_status_in_current_file(ids_to_toggle):
+    """SWAP/TOGGLE disabled status in CURRENT_FILE_INFO content_str."""
     print_loading("Toggling status (swap) in memory...")
-    try: data = json.loads(CURRENT_FILE_INFO['content_str'], object_pairs_hook=collections.OrderedDict); structure = "array" if "directives" in data else "single_object"
-    except (ValueError, JSONDecodeError): print_error("Cannot parse current file content."); return False, 0
-    if structure != "array": print_error("Toggle only supported for array structure."); return False, 0
-    toggled_summary = []; ids_set = set(int(i) for i in ids_to_toggle); items_toggled_count = 0
+
+    try:
+        # Load the current data from the string state
+        data = json.loads(CURRENT_FILE_INFO['content_str'], object_pairs_hook=collections.OrderedDict)
+        structure = "array" if "directives" in data else "single_object"
+    except (ValueError, JSONDecodeError):
+        print_error("Cannot parse current file content as JSON.")
+        return False, 0 # Failed, 0 toggled
+
+    if structure != "array":
+        print_error("Toggle operation only supported for files with 'directives' array.")
+        return False, 0 # Failed, 0 toggled
+
+    toggled_summary = []
+    ids_set = set(int(i) for i in ids_to_toggle)
+    items_toggled_count = 0
+
+    # --- Apply modifications directly to the 'data' object ---
     for directive in data.get("directives", []):
         dir_id = directive.get('id')
         if dir_id is not None and int(dir_id) in ids_set:
-            current_status = directive.get('disabled', False); new_status = not current_status; directive['disabled'] = new_status; items_toggled_count += 1
+            current_status = directive.get('disabled', False)
+            new_status = not current_status
+            directive['disabled'] = new_status # Modify the dictionary directly
+            items_toggled_count += 1
             status_str = "{}PASSIVE{}".format(TColors.YELLOW, TColors.RESET) if new_status else "{}ACTIVE{}".format(TColors.GREEN, TColors.RESET)
             toggled_summary.append("  → Status for '{}' changed to {}".format(directive.get('name', 'N/A'), status_str))
+    # --- End applying modifications ---
+
     if items_toggled_count > 0:
         try:
-            output = io.StringIO(); json.dump(data, output, indent=4, ensure_ascii=False); new_content_str = output.getvalue(); output.close()
-            try: unicode; CURRENT_FILE_INFO['content_str'] = new_content_str.decode('utf-8') if isinstance(new_content_str, str) else new_content_str
-            except NameError: CURRENT_FILE_INFO['content_str'] = new_content_str
-            CURRENT_FILE_INFO['modified'] = True; print_success("Update SUCCESSFUL for {} item(s) in memory.".format(items_toggled_count))
-            if toggled_summary: print("\n{}Change Details:{}".format(TColors.BOLD+TColors.CYAN, TColors.RESET)); print("\n".join(toggled_summary))
+            # --- [CORRECTED SERIALIZATION BLOCK] ---
+            # 1. Use json.dumps directly to get the string
+            #    Py2 -> str (bytes, utf-8)
+            #    Py3 -> str (unicode)
+            json_string = json.dumps(data, indent=4, ensure_ascii=False)
+
+            # 2. Check if we are in Python 2 and need to decode
+            try:
+                unicode # Attempt to access 'unicode', fails in Py3
+                # If we are in Py2 and the result is bytes (str), decode to unicode
+                if isinstance(json_string, str):
+                    json_string = json_string.decode('utf-8')
+            except NameError:
+                # This is Py3, json_string is already unicode (str)
+                pass
+
+            # 3. Store the guaranteed unicode string back into the state
+            CURRENT_FILE_INFO['content_str'] = json_string
+            CURRENT_FILE_INFO['modified'] = True
+            # --- [END CORRECTED SERIALIZATION BLOCK] ---
+
+            print_success("Update SUCCESSFUL for {} item(s) in memory.".format(items_toggled_count))
+            # Display toggle details (unchanged)
+            if toggled_summary:
+                print("\n{}Change Details:{}".format(TColors.BOLD + TColors.CYAN, TColors.RESET))
+                print("\n".join(toggled_summary))
             return True, items_toggled_count
-        except Exception as e: print_error("Failed to serialize JSON after toggle: {}".format(e)); return False, 0
-    else: print_warning("No matching directives found to toggle."); return True, 0
+        except Exception as e:
+            # Catch potential errors during dumps or decode
+            print_error("Failed to serialize JSON after toggle: {}".format(e))
+            return False, 0
+    else:
+        # No items matched, but the process didn't fail
+        print_warning("No matching directives found to toggle.")
+        return True, 0 # Considered success
 # --- End Modified Update Functions ---
 
 def select_directives_from_data(data, show_az_options=False, initial_filter=None):
