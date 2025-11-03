@@ -1,7 +1,8 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 import os
-import re
+import re  # <-- Impor ini sudah ada (atau ditambahkan)
 import sys
 import json
 import base64
@@ -30,11 +31,13 @@ GITHUB_BRANCH = os.getenv("GITHUB_BRANCH")
 OUT_DIR = os.getenv("OUT_DIR", "./pulled_configs")
 
 # ====== KONFIGURASI DISTRIBUSI & RESTART ======
-LOGSTASH_PIPE_DIR = os.getenv("LOGSTASH_PIPE_DIR")
-LOGSTASH_JSON_DICT_DIR = os.getenv("LOGSTASH_JSON_DICT_DIR")
-LOGSTASH_HOME     = os.getenv("LOGSTASH_HOME")
-VECTOR_CONFIG_BASE_DIR = os.getenv("VECTOR_CONFIG_BASE_DIR")
-NFS_BASE_DIR           = os.getenv("NFS_BASE_DIR")
+# --- DIMODIFIKASI: Diinisialisasi sebagai None, akan diisi oleh reload_global_paths() ---
+LOGSTASH_PIPE_DIR = None
+LOGSTASH_JSON_DICT_DIR = None
+LOGSTASH_HOME     = None
+VECTOR_CONFIG_BASE_DIR = None
+NFS_BASE_DIR           = None
+# --- Akhir Modifikasi ---
 FRONTEND_POD      = "dsiem-frontend-0"
 BACKEND_POD       = "dsiem-backend-0"
 VECTOR_POD_LABEL  = "app=vector-parser"
@@ -137,6 +140,97 @@ def ask_yes_no(p, allow_back=False):
             if a == 'b': return BACK_COMMAND
             return a
         print("Pilihan tidak valid. Harap masukkan {}".format('/'.join(sorted(list(valid_chars)))))
+
+# --- FUNGSI HELPER BARU DITAMBAHKAN ---
+
+def ask_for_path(prompt, default_value):
+    """Meminta input path absolut dari user, dengan nilai default."""
+    while True:
+        # Tampilkan default dalam prompt
+        user_input = input("{} [Default: {}]: ".format(prompt, default_value)).strip()
+        if not user_input:
+            # User tekan Enter, gunakan default
+            return default_value
+        
+        # Validasi sederhana: pastikan path adalah absolut
+        if not user_input.startswith('/'):
+            print("[ERROR] Harap masukkan path absolut (dimulai dengan '/').")
+            continue
+        
+        return user_input
+
+def update_config_sh(paths_to_update):
+    """Menulis ulang nilai variabel di config.sh dengan aman."""
+    CONFIG_SH_PATH = './config.sh' # Asumsi config.sh ada di direktori yang sama
+    print("[CONFIG] Memperbarui {}...".format(CONFIG_SH_PATH))
+    if not os.path.exists(CONFIG_SH_PATH):
+        print("[WARN] config.sh tidak ditemukan di {}. Perubahan tidak akan permanen.".format(os.path.abspath(CONFIG_SH_PATH)))
+        return False
+    
+    try:
+        with io.open(CONFIG_SH_PATH, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        new_lines = []
+        # Regex untuk menangkap: export KEY="VALUE" atau export KEY=VALUE
+        export_re = re.compile(r'^(export\s+)([A-Za-z_][A-Za-z0-9_]+)=("?)(.*?)("?\s*)$')
+        updated_keys = set()
+        
+        for line in lines:
+            match = export_re.match(line)
+            if match:
+                key = match.group(2)
+                if key in paths_to_update:
+                    new_value = paths_to_update[key]
+                    # Buat ulang baris, pastikan ada tanda kutip
+                    new_line = 'export {}="{}"\n'.format(key, new_value)
+                    new_lines.append(new_line)
+                    updated_keys.add(key)
+                    print("    -> Memperbarui {}...".format(key))
+                    continue
+            # Jika tidak cocok atau key tidak ada di update list, tambahkan baris asli
+            new_lines.append(line)
+        
+        # Cek apakah ada key yang diminta tapi tidak ada di file
+        missing_keys = set(paths_to_update.keys()) - updated_keys
+        if missing_keys:
+            print("[WARN] Variabel berikut tidak ditemukan di config.sh dan tidak diperbarui:")
+            for key in missing_keys: print("    - {}".format(key))
+
+        # Tulis kembali file
+        if not DRY_RUN:
+            with io.open(CONFIG_SH_PATH, 'w', encoding='utf-8') as f:
+                f.writelines(new_lines)
+            print("[CONFIG] {} berhasil diperbarui.".format(CONFIG_SH_PATH))
+            return True
+        else:
+            print("[DRY RUN] Perubahan {} dilewati.".format(CONFIG_SH_PATH))
+            return True
+    except Exception as e:
+        print("[ERROR] Gagal menulis ke {}: {}".format(CONFIG_SH_PATH, e))
+        return False
+
+def reload_global_paths():
+    """Memuat ulang variabel path global dari os.environ."""
+    global LOGSTASH_PIPE_DIR, LOGSTASH_JSON_DICT_DIR, LOGSTASH_HOME
+    global VECTOR_CONFIG_BASE_DIR, NFS_BASE_DIR
+    
+    print("[INFO] Memuat ulang variabel path dari environment...")
+    
+    LOGSTASH_PIPE_DIR = os.getenv("LOGSTASH_PIPE_DIR")
+    LOGSTASH_JSON_DICT_DIR = os.getenv("LOGSTASH_JSON_DICT_DIR")
+    LOGSTASH_HOME     = os.getenv("LOGSTASH_HOME")
+    VECTOR_CONFIG_BASE_DIR = os.getenv("VECTOR_CONFIG_BASE_DIR")
+    NFS_BASE_DIR           = os.getenv("NFS_BASE_DIR")
+    
+    # Validasi sederhana saat memuat
+    if not LOGSTASH_PIPE_DIR: print("[WARN] Env LOGSTASH_PIPE_DIR tidak diset!")
+    if not LOGSTASH_JSON_DICT_DIR: print("[WARN] Env LOGSTASH_JSON_DICT_DIR tidak diset!")
+    if not VECTOR_CONFIG_BASE_DIR: print("[WARN] Env VECTOR_CONFIG_BASE_DIR tidak diset!")
+    # tambahkan warning lain jika perlu
+
+# --- AKHIR FUNGSI HELPER BARU ---
+
 
 def setup_customer_info():
     print_header("Konfigurasi Customer")
@@ -420,20 +514,37 @@ def process_plugin(plugin_path):
 
 def distribute_logstash(downloaded_files):
     print_header("Distribusi ke Logstash untuk: {}".format(downloaded_files.get('path', 'N/A')))
-    if "conf70" in downloaded_files: safe_copy(downloaded_files["conf70"], LOGSTASH_PIPE_DIR)
+    # --- Gunakan variabel global yang sudah dimuat ulang ---
+    if "conf70" in downloaded_files:
+        if LOGSTASH_PIPE_DIR: safe_copy(downloaded_files["conf70"], LOGSTASH_PIPE_DIR)
+        else: print("[ERROR] LOGSTASH_PIPE_DIR tidak diset. Penyalinan .conf dilewati.")
     else: print("[WARN] File conf70 tidak ada.")
-    if "json_dict" in downloaded_files: safe_makedirs(LOGSTASH_JSON_DICT_DIR); safe_copy(downloaded_files["json_dict"], LOGSTASH_JSON_DICT_DIR)
+    
+    if "json_dict" in downloaded_files:
+        if LOGSTASH_JSON_DICT_DIR:
+            safe_makedirs(LOGSTASH_JSON_DICT_DIR)
+            safe_copy(downloaded_files["json_dict"], LOGSTASH_JSON_DICT_DIR)
+        else: print("[ERROR] LOGSTASH_JSON_DICT_DIR tidak diset. Penyalinan .json dilewati.")
     else: print("[WARN] File json_dict tidak ada.")
+
     if "directive" in downloaded_files: safe_run_cmd(["kubectl", "cp", downloaded_files["directive"], "{}:/dsiem/configs/".format(FRONTEND_POD)])
     else: print("[WARN] File directive tidak ada.")
 
 def distribute_vector(downloaded_files, parent):
     print_header("Distribusi ke Vector untuk: {}".format(downloaded_files.get('path', 'N/A')))
+    # --- Gunakan variabel global yang sudah dimuat ulang ---
     if "vector_conf" in downloaded_files:
-        vector_target_dir = os.path.join(VECTOR_CONFIG_BASE_DIR, parent); safe_makedirs(vector_target_dir)
-        safe_copy(downloaded_files["vector_conf"], vector_target_dir)
+        if VECTOR_CONFIG_BASE_DIR:
+            vector_target_dir = os.path.join(VECTOR_CONFIG_BASE_DIR, parent); safe_makedirs(vector_target_dir)
+            safe_copy(downloaded_files["vector_conf"], vector_target_dir)
+        else: print("[ERROR] VECTOR_CONFIG_BASE_DIR tidak diset. Penyalinan .yaml dilewati.")
     else: print("[WARN] File vector_conf tidak ada.")
+
     if "tsv" in downloaded_files:
+        if not NFS_BASE_DIR:
+            print("[ERROR] NFS_BASE_DIR tidak diset. Pencarian .tsv dilewati.")
+            return # Keluar dari fungsi jika NFS_BASE_DIR tidak ada
+        
         print("[DIST] Mencari direktori NFS 'dsiem-plugin-tsv' di {}...".format(NFS_BASE_DIR))
         if not DRY_RUN:
             nfs_target_dir = None
@@ -463,7 +574,7 @@ def register_job(updater_path, is_focal_plugin, selected_action):
     try:
         with io.open(updater_path, 'r', encoding='utf-8') as f: updater_data = json.load(f, object_pairs_hook=OrderedDict)
         # Tentukan flag: True jika aksi = "Distribusi...", False jika "HANYA..."
-        distribution_flag = "Distribusi" in selected_action
+        distribution_flag = selected_action.startswith("Distribusi")
         # Tambahkan/Update flag di 'layout'
         if 'layout' not in updater_data: updater_data['layout'] = OrderedDict() # Buat jika belum ada
         updater_data['layout']['needs_distribution'] = distribution_flag
@@ -506,11 +617,12 @@ def restart_stack(action):
     logstash_restarted = False
     if "Logstash" in action:
         print("[INFO] Menjalankan update & restart Logstash...")
-        if os.path.isdir(LOGSTASH_HOME):
+        # --- Gunakan variabel global yang sudah dimuat ulang ---
+        if LOGSTASH_HOME and os.path.isdir(LOGSTASH_HOME):
              safe_run_cmd(["./update-config-map.sh"], cwd=LOGSTASH_HOME, shell=True)
              safe_run_cmd(["./restart-logstash.sh"], cwd=LOGSTASH_HOME, shell=True)
              logstash_restarted = True
-        else: print("[WARN] Direktori LOGSTASH_HOME '{}' tidak ada.".format(LOGSTASH_HOME))
+        else: print("[WARN] Direktori LOGSTASH_HOME '{}' tidak ada atau tidak diset.".format(LOGSTASH_HOME))
     elif "Vector" in action:
         print("[INFO] Merestart pod Vector...")
         safe_run_cmd(["kubectl", "delete", "pod", "-l", VECTOR_POD_LABEL])
@@ -531,6 +643,9 @@ def main():
     args = parser.parse_args(); DRY_RUN = args.dry_run
     if DRY_RUN: print("\n" + "#"*60 + "\n### DRY RUN MODE. NO CHANGES WILL BE MADE. ###\n" + "#"*60)
 
+    # --- DIMODIFIKASI: Panggil reload_global_paths() di awal ---
+    reload_global_paths()
+    
     print_header("Skrip Pull & Distribusi Konfigurasi"); require_github()
     setup_customer_info()
 
@@ -603,11 +718,95 @@ def main():
                 selection.pop('passive_scope', None); selection.pop('plugins_to_process', None); selection.pop('passive_plugins', None); selection.pop('passive_scope_desc', None)
                 if prev_step == 'focal_plugins': selection.pop('focal_plugins', None)
                 current_step = prev_step; continue
-            selection['action'] = result; current_step = 'active_plugins'
+            
+            selection['action'] = result
+            
+            # --- MODIFIKASI: Arahkan ke step baru jika distribusi dipilih ---
+            if "Distribusi" in result:
+                current_step = 'distribution_paths' # Step baru
+            else:
+                current_step = 'active_plugins' # Lewati step baru
+            # --- AKHIR MODIFIKASI ---
+
+        # --- STEP BARU: DITAMBAHKAN ---
+        elif current_step == 'distribution_paths':
+            print_header("Konfigurasi Path Distribusi")
+            action_type = "Logstash" if "Logstash" in selection['action'] else "Vector"
+            print("Aksi dipilih: Distribusi ke {}".format(action_type))
+            
+            # Tampilkan path default saat ini (dari variabel global yang sudah dimuat)
+            print("\nPath default saat ini (dari environment):")
+            if action_type == "Logstash":
+                print("  - Config .conf : {}".format(LOGSTASH_PIPE_DIR or "BELUM DISET"))
+                print("  - Dict .json   : {}".format(LOGSTASH_JSON_DICT_DIR or "BELUM DISET"))
+                print("  - Logstash Home: {}".format(LOGSTASH_HOME or "BELUM DISET")) # Untuk restart
+            else: # Vector
+                print("  - Config .yaml : {}".format(VECTOR_CONFIG_BASE_DIR or "BELUM DISET"))
+                print("  - NFS TSV      : {}".format(NFS_BASE_DIR or "BELUM DISET")) # Untuk TSV
+            
+            options = ["Gunakan path default", "Masukkan path custom (akan disimpan ke config.sh)"]
+            result = select_from_list(options, "Pilih Path", can_go_back=True)
+
+            if result == BACK_COMMAND:
+                selection.pop('action', None)
+                current_step = 'action'
+                continue
+            
+            if "custom" in result:
+                # --- Panggil Logika Custom ---
+                print_header("Masukkan Path Custom")
+                new_paths = {}
+                
+                if action_type == "Logstash":
+                    new_paths["LOGSTASH_PIPE_DIR"] = ask_for_path(
+                        "Path Pipa .conf", os.getenv("LOGSTASH_PIPE_DIR", "") # Ambil default dari env
+                    )
+                    new_paths["LOGSTASH_JSON_DICT_DIR"] = ask_for_path(
+                        "Path Diksi .json", os.getenv("LOGSTASH_JSON_DICT_DIR", "")
+                    )
+                    new_paths["LOGSTASH_HOME"] = ask_for_path(
+                        "Path Logstash Home (untuk restart)", os.getenv("LOGSTASH_HOME", "")
+                    )
+                else: # Vector
+                    new_paths["VECTOR_CONFIG_BASE_DIR"] = ask_for_path(
+                        "Path Base Config Vector", os.getenv("VECTOR_CONFIG_BASE_DIR", "")
+                    )
+                    new_paths["NFS_BASE_DIR"] = ask_for_path(
+                        "Path Base NFS (untuk TSV)", os.getenv("NFS_BASE_DIR", "")
+                    )
+                
+                # Coba perbarui config.sh
+                if update_config_sh(new_paths):
+                    print("[INFO] Memperbarui environment sesi ini...")
+                    # Update environment untuk sesi ini
+                    for key, value in new_paths.items():
+                        os.environ[key] = value
+                    
+                    # Muat ulang variabel global
+                    reload_global_paths()
+                    print("[INFO] Variabel path telah diperbarui untuk sesi ini.")
+                else:
+                    print("[ERROR] Gagal memperbarui config.sh. Menggunakan path lama.")
+                    # Tidak lanjut, biarkan user coba lagi
+                    continue 
+            
+            # Baik "Default" atau "Custom" sukses, lanjut
+            current_step = 'active_plugins'
+        # --- AKHIR STEP BARU ---
 
         elif current_step == 'active_plugins':
             result = select_active_notifications(selection.get('focal_plugins', []))
-            if result == BACK_COMMAND: selection.pop('action', None); current_step = 'action'; continue
+            if result == BACK_COMMAND: 
+                # --- MODIFIKASI: Kembali ke step yg benar ---
+                selection.pop('action', None)
+                # Jika path custom diset, kembali ke sana, jika tidak, kembali ke action
+                prev_step = 'distribution_paths' if 'Distribusi' in selection.get('action', '') else 'action'
+                selection.pop('action', None) # Hapus aksi agar bisa dipilih ulang
+                current_step = prev_step
+                # Hapus juga 'action' agar bisa dipilih ulang
+                current_step = 'action'
+                # --- AKHIR MODIFIKASI ---
+                continue
             selection['active_plugins'] = result; current_step = 'summary'
 
         elif current_step == 'summary':
