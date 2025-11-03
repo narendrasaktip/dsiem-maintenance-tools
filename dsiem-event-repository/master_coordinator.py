@@ -1,40 +1,43 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 import os
 import json
 import subprocess
 import sys
-import io # <-- Import io
+import io # Pastikan io diimport
 from datetime import datetime
+
+# --- Penyesuaian Kompatibilitas Py2/Py3 ---
+try:
+    JSONDecodeError = json.JSONDecodeError # Coba ambil nama Py3
+except AttributeError:                     # Jika gagal (berarti Py2)
+    JSONDecodeError = ValueError          # Gunakan nama Py2 (ValueError) sebagai gantinya
+try:
+    FileNotFoundError                     # Coba ambil nama Py3
+except NameError:                         # Jika gagal (berarti Py2)
+    FileNotFoundError = IOError           # Gunakan nama Py2 (IOError) sebagai gantinya
+# --- AKHIR BLOK KOMPATIBILITAS ---
 
 JOBS_FILE = 'master_jobs.json'
 UPDATER_SCRIPT = 'auto-updated.py'
 
-# Konfigurasi Restart (sesuaikan jika perlu)
+# --- [DIPERBAIKI] Konfigurasi Restart (membaca semua var) ---
 LOGSTASH_HOME     = os.getenv("LOGSTASH_HOME")
-BACKEND_POD = "dsiem-backend-0"
-FRONTEND_POD = "dsiem-frontend-0"
-
-# --- Penyesuaian Kompatibilitas Py2/Py3 ---
-try:
-    JSONDecodeError = json.JSONDecodeError
-except AttributeError:
-    JSONDecodeError = ValueError
-try:
-    FileNotFoundError
-except NameError:
-    FileNotFoundError = IOError
-# ---
+BACKEND_POD       = os.getenv("BACKEND_POD", "dsiem-backend-0")
+FRONTEND_POD      = os.getenv("FRONTEND_POD", "dsiem-frontend-0")
+VECTOR_POD_LABEL  = os.getenv("VECTOR_POD_LABEL", "app=vector-parser") # Ditambahkan
+# --- AKHIR PERBAIKAN ---
 
 def log(message):
+    """Mencetak log dengan timestamp."""
     ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     print("[{}] {}".format(ts, message))
 
-# --- Fungsi safe_run_cmd (didefinisikan ulang di sini) ---
 def safe_run_cmd(cmd, cwd=None, shell=False):
+    """Menjalankan perintah shell dengan aman dan mencatat outputnya."""
     cmd_str = " ".join(cmd) if isinstance(cmd, list) else cmd
     log("[CMD] Menjalankan: {}".format(cmd_str))
-    # Di sini tidak perlu DRY RUN karena hanya dipanggil jika needs_restart=True
     try:
         p = subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=shell)
         out, err = p.communicate()
@@ -49,7 +52,33 @@ def safe_run_cmd(cmd, cwd=None, shell=False):
     except OSError as e:
         log("[CMD FATAL] Gagal menjalankan perintah: {}".format(e))
         return False
-# --- Akhir safe_run_cmd ---
+
+# --- [BARU] Fungsi Helper Restart ---
+def restart_logstash_stack():
+    """Melakukan restart stack Logstash (termasuk pod)."""
+    log("[RESTART] Menjalankan update dan restart untuk Logstash...")
+    if LOGSTASH_HOME and os.path.isdir(LOGSTASH_HOME): # Cek jika direktori Logstash ada
+         safe_run_cmd(["./update-config-map.sh"], cwd=LOGSTASH_HOME, shell=True)
+         safe_run_cmd(["./restart-logstash.sh"], cwd=LOGSTASH_HOME, shell=True)
+    elif LOGSTASH_HOME:
+         log("[WARN] Direktori LOGSTASH_HOME '{}' tidak ditemukan. Melewati restart Logstash.".format(LOGSTASH_HOME))
+    else:
+         log("[WARN] LOGSTASH_HOME env var tidak diset. Melewati restart Logstash.")
+
+    log("[RESTART] Merestart pod Backend dan Frontend (untuk Logstash)...")
+    safe_run_cmd(["kubectl", "delete", "pod", BACKEND_POD, FRONTEND_POD])
+
+def restart_vector_stack():
+    """Melakukan restart stack Vector (termasuk pod)."""
+    log("[RESTART] Merestart pod Vector...")
+    if not VECTOR_POD_LABEL:
+        log("[WARN] VECTOR_POD_LABEL tidak diset. Tidak dapat merestart pod Vector.")
+    else:
+        safe_run_cmd(["kubectl", "delete", "pod", "-l", VECTOR_POD_LABEL])
+    
+    log("[RESTART] Merestart pod Backend dan Frontend (untuk Vector)...")
+    safe_run_cmd(["kubectl", "delete", "pod", BACKEND_POD, FRONTEND_POD])
+# --- AKHIR FUNGSI HELPER RESTART ---
 
 def main():
     """Fungsi utama untuk menjalankan semua pekerjaan auto-update."""
@@ -77,7 +106,9 @@ def main():
 
     success_count = 0
     fail_count = 0
-    needs_restart = False # Flag restart
+    # --- [DIPERBAIKI] Menggunakan set untuk melacak target restart ---
+    restart_targets = set() 
+    # --- AKHIR PERBAIKAN ---
 
     for i, config_path in enumerate(jobs, 1):
         log("\n--- Menjalankan Pekerjaan {}/{} (Config: {}) ---".format(i, len(jobs), config_path))
@@ -86,6 +117,18 @@ def main():
             log("[WARN] File konfigurasi '{}' tidak ditemukan. Dilewati.".format(config_path))
             fail_count += 1
             continue
+
+        # --- [DIPERBAIKI] Baca config SEBELUM menjalankan worker ---
+        job_target = "None"
+        try:
+            with io.open(config_path, 'r', encoding='utf-8') as f_cfg:
+                job_cfg = json.load(f_cfg)
+                # Ambil target, default ke 'Logstash' jika tidak ada (untuk kompatibilitas lama)
+                job_target = job_cfg.get("layout", {}).get("distribution_target", "Logstash") 
+        except Exception as e:
+            log("[WARN] Gagal membaca config '{}': {}. Mengasumsikan target 'Logstash'.".format(config_path, e))
+            job_target = "Logstash" # Default jika file config rusak
+        # --- AKHIR PERBAIKAN ---
 
         try:
             command = [sys.executable, UPDATER_SCRIPT]
@@ -100,7 +143,13 @@ def main():
             elif process.returncode == 5: # Sinyal restart diterima
                 log("--- Pekerjaan '{}' sukses (membutuhkan restart stack). ---\n".format(config_path))
                 success_count += 1
-                needs_restart = True # Set flag untuk restart nanti
+                # --- [DIPERBAIKI] Catat target yg perlu di-restart ---
+                if job_target in ["Logstash", "Vector"]:
+                    log("[INFO] Menandai '{}' untuk di-restart.".format(job_target))
+                    restart_targets.add(job_target)
+                else:
+                    log("[WARN] Menerima sinyal restart, tapi target '{}' tidak dikenali.".format(job_target))
+                # --- AKHIR PERBAIKAN ---
             else:
                 log("[ERROR] Pekerjaan '{}' gagal (return code {}). ---\n".format(config_path, process.returncode))
                 fail_count += 1
@@ -114,23 +163,25 @@ def main():
     log("=== Master Koordinator Selesai ===")
     log("Ringkasan: {} sukses, {} gagal.".format(success_count, fail_count))
 
-    # Jalankan restart HANYA JIKA flag needs_restart aktif
-    if needs_restart:
+    # --- [DIPERBAIKI] Jalankan restart berdasarkan target ---
+    if restart_targets:
         log("\n=== Memulai Restart Stack (Karena ada update lokal) ===")
-        log("[INFO] Menjalankan update dan restart untuk Logstash...")
+        
+        # Logstash diutamakan karena me-restart pod backend/frontend
+        if "Logstash" in restart_targets:
+            restart_logstash_stack()
+            
+        if "Vector" in restart_targets:
+            # Jika Logstash sudah restart pods, kita tidak perlu restart lagi
+            if "Logstash" not in restart_targets:
+                restart_vector_stack()
+            else:
+                log("[INFO] Restart pod Vector dilewati karena Logstash sudah merestart pod (termasuk backend/frontend).")
 
-        # Jalankan perintah restart
-        if os.path.isdir(LOGSTASH_HOME): # Cek jika direktori Logstash ada
-             safe_run_cmd(["./update-config-map.sh"], cwd=LOGSTASH_HOME, shell=True)
-             safe_run_cmd(["./restart-logstash.sh"], cwd=LOGSTASH_HOME, shell=True)
-        else:
-             log("[WARN] Direktori LOGSTASH_HOME '{}' tidak ditemukan. Melewati restart Logstash.".format(LOGSTASH_HOME))
-
-        log("[INFO] Merestart pod Backend dan Frontend...")
-        safe_run_cmd(["kubectl", "delete", "pod", BACKEND_POD, FRONTEND_POD])
         log("=== Restart Stack Selesai ===")
     else:
         log("Tidak ada update lokal yang terdeteksi, restart stack dilewati.")
+    # --- AKHIR PERBAIKAN ---
 
     # Return code 1 jika ada yg gagal, 0 jika semua sukses (termasuk yg butuh restart)
     return 1 if fail_count > 0 else 0

@@ -21,6 +21,10 @@ EMAIL_SMTP_PORT = int(os.getenv("EMAIL_SMTP_PORT"))
 EMAIL_SENDER = os.getenv("EMAIL_SENDER")
 EMAIL_APP_PASSWORD = os.getenv("EMAIL_APP_PASSWORD")
 EMAIL_RECIPIENTS = os.getenv("EMAIL_RECIPIENTS")
+# --- [DIPERBAIKI] Membaca path dari environment ---
+LOGSTASH_JSON_DICT_DIR = os.getenv("LOGSTASH_JSON_DICT_DIR")
+VECTOR_CONFIG_BASE_DIR = os.getenv("VECTOR_CONFIG_BASE_DIR")
+NFS_BASE_DIR = os.getenv("NFS_BASE_DIR")
 # =========================================================
 
 # =========================================================
@@ -120,6 +124,8 @@ def send_notification_email(customer_name, header_name, new_events):
     # Konversi waktu ke WIB (+7 jam)
     now_in_wib = datetime.utcnow() + timedelta(hours=7)
     subject_timestamp = now_in_wib.strftime('%d %b %Y | %H:%M WIB')
+    
+    # --- [DIPERBAIKI] Cek placeholder customer name (sudah diperbaiki di main) ---
     subject = "[New Event] [{}] - {} New Events for {} - ({})".format(customer_name, count, header_name, subject_timestamp)
     detection_time = now_in_wib.strftime('%d %B %Y, %H:%M:%S WIB')
 
@@ -390,6 +396,7 @@ def gh_put(repo, branch, token, path, bytes_content, message, sha=None, debug=Fa
     if r.status_code >= 300: die("GitHub PUT Error {} {}:\n{}".format(r.status_code, path, r.text[:400])); return {}
     try: return r.json() # Return response which includes new SHA
     except ValueError: die("GitHub PUT Response for {} is not valid JSON.".format(path)); return {}
+    
 def gh_paths(log_type, module_name, submodule_name, filter_key, backend_pod="dsiem-backend-0"):
     # Generate slugs safely
     parts = [p for p in [slug(log_type), slug(module_name), slug(submodule_name), slug(filter_key)] if p]
@@ -400,6 +407,8 @@ def gh_paths(log_type, module_name, submodule_name, filter_key, backend_pod="dsi
     return { "tsv": u"{}/{}_plugin-sids.tsv".format(base_dir, full_slug),
              "json_dict": u"{}/{}_plugin-sids.json".format(base_dir, full_slug),
              "conf70": u"{}/70_dsiem-plugin_{}.conf".format(base_dir, full_slug),
+             # --- [DIPERBAIKI] Memastikan path vector ada ---
+             "vector_conf": u"{}/70_transform_dsiem-plugin-{}.yaml".format(base_dir, full_slug),
              "directive": u"{}/directives_{}_{}.json".format(base_dir, backend_pod, full_slug),
              "full_slug": full_slug }
 # =========================================================
@@ -460,13 +469,19 @@ def fetch_titles(es_cfg, q_cfg, debug=False):
 # =========================================================
 
 # =========================================================
-# DISTRIBUTE LOCAL FUNCTION (Return True jika ada perubahan)
+# DISTRIBUTE LOCAL FUNCTIONS (Return True jika ada perubahan)
 # =========================================================
-def distribute_and_update_local(merged_rows, paths, cfg, plugin_id, template_map, template_id, args):
-    section("Distribute Local Files (Kubernetes)")
+def distribute_logstash_local(merged_rows, paths, cfg, plugin_id, template_map, template_id, args):
+    section("Distribute Local Files (Logstash)")
     made_local_changes = False
-    # Path ke direktori JSON di server Logstash
-    logstash_json_dir = "/root/kubeappl/logstash/configs/pipelines/dsiem-events/dsiem-plugin-json/" # Sesuaikan path ini
+    
+    # --- [DIPERBAIKI] Membaca path dari Env Var ---
+    if not LOGSTASH_JSON_DICT_DIR:
+        err("LOGSTASH_JSON_DICT_DIR env var not set. Cannot distribute JSON dict.")
+        return False # Keluar jika path tidak diset
+    logstash_json_dir = LOGSTASH_JSON_DICT_DIR
+    # --- Akhir Perbaikan ---
+
     json_filename = os.path.basename(paths["json_dict"])
     logstash_dest_path = os.path.join(logstash_json_dir, json_filename)
     info("Handling Logstash JSON dictionary...")
@@ -576,6 +591,86 @@ def distribute_and_update_local(merged_rows, paths, cfg, plugin_id, template_map
 
     # Kembalikan status apakah ada perubahan lokal atau tidak
     return made_local_changes
+
+# --- [FUNGSI BARU] Ditambahkan untuk Vector ---
+def distribute_vector_local(merged_rows, paths, cfg, args):
+    section("Distribute Local Files (Vector)")
+    made_local_changes = False
+
+    # 1. Cek Path Env
+    if not VECTOR_CONFIG_BASE_DIR or not NFS_BASE_DIR:
+        err("VECTOR_CONFIG_BASE_DIR or NFS_BASE_DIR env vars not set. Cannot distribute.")
+        return False
+        
+    # 2. Dapatkan Path Parent (untuk folder config vector)
+    try:
+        parent_folder = paths["tsv"].split('/')[0]
+    except Exception:
+        err("Cannot determine parent folder from path: {}".format(paths["tsv"]))
+        return False
+
+    # 3. Distribusi Vector .yaml (Asumsi .yaml tidak dibuat ulang oleh worker, hanya TSV)
+    #    Jika .yaml juga perlu dibuat/di-sync, logikanya harus ditambahkan di sini.
+    
+    info("Handling Vector TSV dictionary...")
+    
+    # 4. Salin TSV ke NFS
+    # Cari direktori target di NFS
+    nfs_target_dir = None
+    try:
+        if os.path.isdir(NFS_BASE_DIR): # Cek base dir dulu
+            for item in os.listdir(NFS_BASE_DIR):
+                item_path = os.path.join(NFS_BASE_DIR, item)
+                if os.path.isdir(item_path) and item.startswith("pvc-"):
+                    potential_target = os.path.join(item_path, "dsiem-plugin-tsv")
+                    if os.path.isdir(potential_target): 
+                        nfs_target_dir = potential_target
+                        break
+    except Exception as e:
+        err("Failed to search NFS directory {}: {}".format(NFS_BASE_DIR, e))
+        return False # Gagal jika tidak bisa baca NFS
+
+    if not nfs_target_dir:
+        err("Directory 'dsiem-plugin-tsv' not found in any PVC under {}".format(NFS_BASE_DIR))
+        return False
+
+    # Kita punya target dir. Sekarang kita buat konten TSV baru
+    tsv_filename = os.path.basename(paths["tsv"])
+    nfs_dest_path = os.path.join(nfs_target_dir, tsv_filename)
+    
+    dircfg = cfg.get('directive', {}) # Ambil info category/kingdom
+    category = dircfg.get("CATEGORY", "")
+    kingdom = dircfg.get("KINGDOM", "")
+    plugin_id = cfg.get("file70", {}).get("plugin_id", 0)
+    
+    new_tsv_content_str = tsv_render(merged_rows, paths["full_slug"], plugin_id, category, kingdom)
+    
+    # Baca konten lama
+    existing_tsv_content_str = u""
+    if os.path.exists(nfs_dest_path):
+        try:
+            with io.open(nfs_dest_path, "r", encoding="utf-8") as f_exist:
+                existing_tsv_content_str = f_exist.read()
+        except IOError:
+            warn("Failed read old TSV at {}, overwriting.".format(nfs_dest_path))
+
+    # Bandingkan konten
+    if new_tsv_content_str != existing_tsv_content_str:
+        info("TSV content differs, writing to {}".format(nfs_dest_path))
+        if not args.dry_run:
+            try:
+                with io.open(nfs_dest_path, "w", encoding="utf-8") as f:
+                    f.write(new_tsv_content_str) # tsv_render sudah unicode
+                made_local_changes = True
+                info("Vector TSV dictionary updated.")
+            except IOError as e:
+                err("Failed write TSV to {}: {}".format(nfs_dest_path, e))
+        else:
+            info("[DRY-RUN] TSV write skipped."); made_local_changes = True
+    else:
+        info("Vector TSV dictionary already synced.")
+
+    return made_local_changes
 # =========================================================
 
 # =========================================================
@@ -661,7 +756,7 @@ def main():
         gh_put(gh_repo, gh_branch, GITHUB_TOKEN, registry_path, json.dumps(registry, indent=2, ensure_ascii=False).encode("utf-8"), # ensure_ascii=False
                "[auto] Register plugin_id {} for {}".format(plugin_id, siem_plugin_type), sha=reg_sha, debug=args.debug, dry=args.dry_run)
         info("Plugin Registry push: OK")
-    elif not found_in_reg and args.dry_run: info("[DRY-RUN] Plugin ID {} would be registered.".format(plugin_id))
+    elif not found_in_reg and args.dry_run: info("[DRY-RUN] Plugin ID {} akan diregistrasi.".format(plugin_id))
 
     section("OpenSearch aggregation")
     titles, _, _ = fetch_titles(es_cfg, q_cfg, debug=args.debug)
@@ -689,7 +784,11 @@ def main():
 
     # Send Email only if active and new events
     if added_rows and is_active_for_email:
-        customer_name = cfg.get("customer_info", {}).get("customer_name", "Default")
+        # --- [DIPERBAIKI] Cek nama customer placeholder ---
+        customer_name = cfg.get("customer_info", {}).get("customer_name", "Default Customer")
+        if not customer_name or customer_name == "Nama Customer Anda":
+            customer_name = "Default Customer" # Fallback
+        # --- Akhir Perbaikan ---
         send_notification_email(customer_name, dircfg.get("HEADER", paths["full_slug"]), added_rows)
     elif added_rows: info("Plugin is Passive or Update Only. Skipping email.")
 
@@ -716,7 +815,12 @@ def main():
     conf70_obj, _ = gh_get(gh_repo, gh_branch, GITHUB_TOKEN, paths["conf70"], debug=args.debug)
     if not conf70_obj:
         info("70.conf missing. Generating and pushing...")
-        json_path_on_server = "/root/kubeappl/logstash/configs/pipelines/dsiem-events/dsiem-plugin-json/{}_plugin-sids.json".format(siem_plugin_type)
+        # --- [DIPERBAIKI] Menggunakan Env Var untuk path ---
+        if not LOGSTASH_JSON_DICT_DIR:
+             die("LOGSTASH_JSON_DICT_DIR env var not set. Cannot generate 70.conf.")
+             return 1
+        json_path_on_server = os.path.join(LOGSTASH_JSON_DICT_DIR, "{}_plugin-sids.json".format(siem_plugin_type))
+        # --- Akhir Perbaikan ---
         field_no_keyword = q_cfg.get("field","").replace(".keyword", "")
         if not field_no_keyword: die("Query field missing in config."); return 1
         device_name = layout.get("device")
@@ -752,18 +856,28 @@ def main():
         info("Directives push: OK")
     else: info("Directives already synced.")
 
-    # --- Conditional Local Distribution & Exit Code ---
+    # --- [DIPERBAIKI] Conditional Local Distribution & Exit Code ---
     made_local_changes = False # Default
+    
+    # Baca target distribusi dari config (yang ditulis oleh 01.pull-directive.py)
+    distribution_target = layout.get("distribution_target", "Logstash") # Default "None"
 
     # Jalankan HANYA jika needs_distribution=True DAN ada event baru/directive baru
-    # Kita cek added_rows (event baru) ATAU appended (directive baru ditambahkan ke JSON)
     if needs_distribution and (added_rows or appended):
-        info("Distribution enabled and changes detected, running local distribution...")
-        made_local_changes = distribute_and_update_local(merged_rows, paths, cfg, plugin_id, template_map, template_id, args)
+        info("Distribution enabled (Target: {}) and changes detected...".format(distribution_target))
+        
+        if distribution_target == "Logstash":
+            made_local_changes = distribute_logstash_local(merged_rows, paths, cfg, plugin_id, template_map, template_id, args)
+        elif distribution_target == "Vector":
+            made_local_changes = distribute_vector_local(merged_rows, paths, cfg, args)
+        else:
+            warn("Distribution enabled but target is '{}' or 'None'. Skipping local distribution.".format(distribution_target))
+
     elif needs_distribution:
         info("Distribution enabled, but no new events or directive changes. Skipping local distribution.")
     else: # needs_distribution is False
         info("Plugin is 'Update Only'. Skipping local distribution.")
+    # --- Akhir Perbaikan ---
 
     section("Summary")
     info("DONE.")

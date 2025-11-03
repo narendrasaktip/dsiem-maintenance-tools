@@ -562,7 +562,7 @@ def distribute_vector(downloaded_files, parent):
     else: print("[WARN] File tsv tidak ada.")
 
 def register_job(updater_path, is_focal_plugin, selected_action):
-    """Menyalin, mendaftarkan, DAN menambahkan flag needs_distribution."""
+    """Menyalin, mendaftarkan, DAN menambahkan flag needs_distribution serta target."""
     if not updater_path or not os.path.exists(updater_path):
         print("[REG] File updater '{}' tidak valid. Pendaftaran dilewati.".format(updater_path))
         return
@@ -573,21 +573,32 @@ def register_job(updater_path, is_focal_plugin, selected_action):
     # --- Blok Baca, Modifikasi Flag, Tulis Ulang ---
     try:
         with io.open(updater_path, 'r', encoding='utf-8') as f: updater_data = json.load(f, object_pairs_hook=OrderedDict)
-        # Tentukan flag: True jika aksi = "Distribusi...", False jika "HANYA..."
+        
+        # --- LOGIKA BARU DI SINI ---
         distribution_flag = selected_action.startswith("Distribusi")
+        distribution_target = "None"
+        if distribution_flag:
+            if "Logstash" in selected_action:
+                distribution_target = "Logstash"
+            elif "Vector" in selected_action:
+                distribution_target = "Vector"
+        
         # Tambahkan/Update flag di 'layout'
         if 'layout' not in updater_data: updater_data['layout'] = OrderedDict() # Buat jika belum ada
         updater_data['layout']['needs_distribution'] = distribution_flag
-        print("  [FLAG] Menetapkan needs_distribution = {} based on action.".format(distribution_flag))
+        updater_data['layout']['distribution_target'] = distribution_target # <-- SIMPAN TARGETNYA
+        
+        print("  [FLAG] Menetapkan needs_distribution = {}".format(distribution_flag))
+        print("  [FLAG] Menetapkan distribution_target = {}".format(distribution_target))
+        # --- AKHIR LOGIKA BARU ---
+
         # Tulis kembali file ASLI (di pulled_configs) dengan flag baru
-        # Gunakan io.open untuk tulis
         json_string_mod = json.dumps(updater_data, indent=2, ensure_ascii=False)
         try: unicode; json_string_mod = json_string_mod.decode('utf-8') if isinstance(json_string_mod, str) else json_string_mod
         except NameError: pass
         with io.open(updater_path, 'w', encoding='utf-8') as f_mod: f_mod.write(json_string_mod); f_mod.write(u'\n')
     except (IOError, JSONDecodeError, ValueError) as e:
         print("[ERROR] Gagal membaca/memodifikasi {}: {}. Flag mungkin tidak benar.".format(updater_path, e))
-        # Lanjutkan proses, tapi flag mungkin salah
     # --- Akhir Blok Modifikasi ---
 
     # Salin file (yang mungkin sudah dimodif) ke folder 'updaters'
