@@ -1,0 +1,167 @@
+{
+  "Cloudflare - API Shield Sequence Mitigation": {
+    "creator": {
+      "device_name": "cloudflare",
+      "index_pattern": "cloudflare-",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "apiShieldSequenceMitigation",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "SecuritySources",
+          "value": "apiShieldSequenceMitigation",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40519
+    },
+    "directive": {
+      "HEADER": "Cloudflare - API Shield Sequence Mitigation",
+      "CATEGORY": "Exploit Public-Facing Application",
+      "KINGDOM": "Initial Access",
+      "generate_directive": "y",
+      "template_id": "Web Attack (Raise on Stage 2)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "f",
+      "sensor_value": "cloudflare-apiShieldSequenceMitigation",
+      "product_mode": "f",
+      "product_value": "index_name",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Action",
+      "custom_data1": "action",
+      "custom_label2": "HTTP Response Code",
+      "custom_data2": "http_response_code",
+      "custom_label3": "Target Domain",
+      "custom_data3": "target_domain",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Cloudflare - API Shield Schema Validation": {
+    "creator": {
+      "device_name": "cloudflare",
+      "index_pattern": "cloudflare-",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "apiShieldSchemaValidation",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "SecuritySources",
+          "value": "apiShieldSchemaValidation",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40516
+    },
+    "directive": {
+      "HEADER": "Cloudflare - API Shield Schema Validation",
+      "CATEGORY": "Exploit Public-Facing Application",
+      "KINGDOM": "Initial Access",
+      "generate_directive": "y",
+      "template_id": "Web Attack (Raise on Stage 2)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "f",
+      "sensor_value": "cloudflare-apiShieldSchemaValidation",
+      "product_mode": "f",
+      "product_value": "index_name",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Action",
+      "custom_data1": "action",
+      "custom_label2": "HTTP Response Code",
+      "custom_data2": "http_response_code",
+      "custom_label3": "Target Domain",
+      "custom_data3": "target_domain",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  },
+  "Cloudflare - DLP": {
+    "creator": {
+      "device_name": "cloudflare",
+      "index_pattern": "cloudflare-",
+      "field_name": "event_name",
+      "size": 100,
+      "module_slug": "dlp",
+      "submodule_slug": "",
+      "filters": [
+        {
+          "field": "SecuritySources",
+          "value": "dlp",
+          "op": "term"
+        }
+      ]
+    },
+    "plugin": {
+      "plugin_id_new": 40518
+    },
+    "directive": {
+      "HEADER": "Cloudflare - DLP",
+      "CATEGORY": "Exploit Public-Facing Application",
+      "KINGDOM": "Initial Access",
+      "generate_directive": "y",
+      "template_id": "Web Attack (Raise on Stage 2)",
+      "DISABLED": "y"
+    },
+    "mappings": {
+      "sensor_mode": "f",
+      "sensor_value": "cloudflare-dlp",
+      "product_mode": "f",
+      "product_value": "index_name",
+      "src_ips_mode": "f",
+      "src_ips_value": "src_ips",
+      "dst_ips_mode": "f",
+      "dst_ips_value": "dst_ips",
+      "src_port_mode": "f",
+      "src_port_value": "src_port",
+      "dst_port_mode": "f",
+      "dst_port_value": "dst_port",
+      "custom_label1": "Action",
+      "custom_data1": "action",
+      "custom_label2": "HTTP Response Code",
+      "custom_data2": "http_response_code",
+      "custom_label3": "Target Domain",
+      "custom_data3": "target_domain",
+      "timestamp_field": "timestamp"
+    },
+    "distribution": {
+      "distribute_70": "n",
+      "distribute_json": "n",
+      "distribute_directive": "n",
+      "restart": "n"
+    }
+  }
+}
