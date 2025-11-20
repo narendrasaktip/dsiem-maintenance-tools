@@ -400,7 +400,7 @@ def manage_distribution_flow(integrations_list, active_plugins):
         print("-" * 70)
         print("Aksi Tersedia:")
         print("  - Masukkan nomor/range (cth: 1, 3-5) untuk **MENGUBAH STATUS PULL/DEPLOY** (Active <-> Local Only).")
-        print("  - 'S' untuk **SIMPAN PERUBAHAN & UPLOAD LAPORAN.**")
+        print("  - 'S' untuk **SIMPAN PERUBAHAN**")
         print("  - 'b' untuk Kembali ke menu utama.")
 
         # Ambil input aksi
@@ -486,7 +486,7 @@ def main_loop():
             print("-" * 70)
             print("Pilihan:")
             print("  - Masukkan nomor/range untuk mengubah status (cth: 1, 3-5)")
-            print("  - 's' untuk **SIMPAN PERUBAHAN & UPLOAD LAPORAN**.")
+            print("  - 's' untuk **SIMPAN PERUBAHAN**.")
             print("  - 'b' untuk Kembali")
 
             temp_active_plugins = active_plugins.copy()
