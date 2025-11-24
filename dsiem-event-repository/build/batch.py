@@ -673,7 +673,11 @@ def build_dictionary_block(rows):
     return "\n".join('        "{}" => "{}"'.format(r["event_name"].replace('"','\\"'), r["plugin_sid"]) for r in rows)
 
 def build_source_if(log_type, event_field, filters):
-    parts=['[@metadata][log_type] == "{}"'.format(log_type), dot_to_brackets(event_field)]
+    # --- [PATCH LOGSTASH 70] Hybrid Matching (Full Regex) ---
+    # if ([@metadata][log_type] =~ "zoom" or [index_name] =~ "zoom")
+    match_condition = '([@metadata][log_type] =~ "{0}" or [index_name] =~ "{0}")'.format(log_type)
+    
+    parts=[match_condition, dot_to_brackets(event_field)]
     for f in filters:
         if f.get("op")=="term":
             fld = f["field"].replace(".keyword","")
