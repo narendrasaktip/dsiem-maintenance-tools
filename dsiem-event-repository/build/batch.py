@@ -103,19 +103,13 @@ def ensure_credentials_file(path):
         raise SystemExit("[CRED ERROR] Path bukan file biasa: {}".format(path))
 
 def write_json_dictionary(path, rows):
-    """
-    Tulis kamus JSON flat { "Event Title": SID, ... } dari rows parse_tsv().
-    Output diurutkan ASC berdasarkan SID (1,2,3,...) agar rapi.
-    Python2/3-safe: pastikan keys unicode dan tulis unicode.
-    """
     import io
     import json as _json
     try:
         from collections import OrderedDict
     except ImportError:
-        from ordereddict import OrderedDict  # jika environment lama
+        from ordereddict import OrderedDict 
 
-    # Kumpulkan pasangan (title, sid) + normalisasi unicode (Py2)
     pairs = []
     for r in rows or []:
         ev = r.get("event_name", "")
@@ -124,8 +118,8 @@ def write_json_dictionary(path, rows):
             if isinstance(ev, str):
                 try: ev = ev.decode("utf-8")
                 except Exception: ev = ev.decode("latin-1", "ignore")
-            elif not isinstance(ev, unicode):  # noqa: F821
-                ev = unicode(ev)              # noqa: F821
+            elif not isinstance(ev, unicode): 
+                ev = unicode(ev)              
         except NameError:
             ev = str(ev)
         ev = ev.strip()
@@ -137,14 +131,13 @@ def write_json_dictionary(path, rows):
             continue
         pairs.append((ev, sid))
 
-    # Urutkan berdasarkan SID ASC, lalu nama event
     pairs.sort(key=lambda x: (x[1], x[0]))
 
     ordered = OrderedDict((k, v) for k, v in pairs)
 
     data = _json.dumps(ordered, ensure_ascii=False, indent=2)
     try:
-        unicode  # noqa: F821
+        unicode 
         if isinstance(data, str):
             data = data.decode("utf-8")
     except NameError:
@@ -202,37 +195,18 @@ def to_logstash_accessor(s):
     return "[{}]".format(s)
 
 def to_vrl_accessor(s):
-    """
-    Converts a field path into valid VRL dot/bracket notation.
-    'device.ip' -> '.device.ip'
-    'field-with-dash' -> '.["field-with-dash"]'
-    'nested.field-with-dash' -> '.nested["field-with-dash"]'
-    """
     if not s: return "."
     s = s.strip()
-
-    # Split the path by dots to handle nested fields
     parts = s.split('.')
     vrl_parts = []
-
     for part in parts:
-        # A valid VRL identifier for dot notation generally contains letters, numbers, and underscores.
-        # We check for any character that is NOT one of those.
         if re.search(r'[^a-zA-Z0-9_]', part):
-            # This part contains special characters (like '-') and needs bracket notation.
             vrl_parts.append('["{}"]'.format(part.replace('"', '\\"')))
         else:
-            # This is a simple identifier that can be prefixed with a dot.
             vrl_parts.append("." + part)
-
-    # Join the parts together. A bracketed part doesn't need a preceding dot.
     result = "".join(vrl_parts)
-
-    # The result might start with a dot (e.g., ".field1"), which is correct.
-    # If it starts with brackets (e.g., '["field-1"]'), it also needs a leading dot.
     if result.startswith("["):
         result = "." + result
-    
     return result
 
 def to_hard_literal(val):
@@ -252,7 +226,7 @@ def to_hard_literal(val):
     return '"{}"'.format(s.replace('"', r'\"'))
 
 def field_to_interp(s):
-    if not s: return ""  # Change this line to return an empty string
+    if not s: return ""
     if s.startswith("%{[") and s.endswith("]}"): return s
     return "%{"+dot_to_brackets(s)+"}"
 
@@ -400,15 +374,11 @@ def gh_paths(log_type, module_name, submodule_name, filter1_slug):
         "base_dir":   base_dir
     }
 
-# --- FUNGSI BARU ---
 def load_plugin_presets(path="plugin_presets.json"):
-    """Membaca file preset JSON lengkap untuk plugin."""
     if not os.path.exists(path):
-        return None # Mengembalikan None jika file tidak ada
+        return None
     try:
-        # Gunakan io.open untuk kompatibilitas Py2/3
         with io.open(path, "r", encoding="utf-8") as f:
-            # Muat dengan OrderedDict untuk menjaga urutan dari file
             data = json.load(f, object_pairs_hook=OrderedDict)
         if not isinstance(data, dict) or not data:
             print("[WARN] plugin_presets.json kosong atau formatnya salah. Fallback ke input manual.")
@@ -419,12 +389,8 @@ def load_plugin_presets(path="plugin_presets.json"):
         return None
 
 def generate_updater_config(output_path, context):
-    """
-    Membuat file konfigurasi updater.json berdasarkan konteks dari eksekusi skrip.
-    """
     print("\n=== GENERATE KONFIGURASI AUTO-UPDATER ===")
     
-    # Merakit struktur JSON menggunakan OrderedDict agar urutannya rapi
     updater_config = OrderedDict([
         ("es", OrderedDict([
             ("host", context.get("es_host")),
@@ -436,20 +402,18 @@ def generate_updater_config(output_path, context):
             ("field", context.get("translate_field_no_kw")),
             ("size", context.get("size")),
             ("filters", context.get("filters")),
-            # --- TAMBAHKAN BLOK INI ---
             ("time_range", OrderedDict([
                 ("field", "@timestamp"),
                 ("gte", "now-1h"),
                 ("lte", "now")
             ]))
-            # --- AKHIR BLOK TAMBAHAN ---
         ])),
         ("layout", OrderedDict([
             ("device", context.get("log_type_auto")),
             ("module", context.get("module_slug")),
             ("submodule", context.get("submodule_slug")),
             ("filter_key", context.get("filter1_slug")),
-            ("needs_distribution", False) # <-- PERUBAHAN KUNCI: Set default ke False
+            ("needs_distribution", False)
         ])),
         ("file70", OrderedDict([
             ("plugin_id", context.get("plugin_id_final"))
@@ -474,10 +438,9 @@ def generate_updater_config(output_path, context):
     except Exception as e:
         print("[ERROR] Gagal membuat file auto-updater config: {}".format(e))
 
-# ====== TSV utils (MODIFIED) ======
+# ====== TSV utils ======
 def write_tsv(path, rows, siem_plugin_type, plugin_id, category, kingdom):
-    """Menulis TSV dengan format 6 kolom yang baru."""
-    rows = sorted(rows, key=lambda r: int(r.get("plugin_sid", 0)))  # ← tambah ini
+    rows = sorted(rows, key=lambda r: int(r.get("plugin_sid", 0)))
     if sys.version_info[0] == 2:
         import io as _io
         f = _io.open(path, "w", encoding="utf-8")
@@ -499,7 +462,6 @@ def write_tsv(path, rows, siem_plugin_type, plugin_id, category, kingdom):
                     except Exception: king = kingdom.decode("latin-1", "ignore")
                 else:
                     king = unicode(kingdom or "")
-                # --- AKHIR PERBAIKAN ---
 
                 f.write(u"{}\t{}\t{}\t{}\t{}\t{}\n".format(plugin, pid, sid, title, cat, king))
     else:
@@ -515,7 +477,6 @@ def write_tsv(path, rows, siem_plugin_type, plugin_id, category, kingdom):
                 f.write("{}\t{}\t{}\t{}\t{}\t{}\n".format(plugin, pid, sid, title, cat, king))
 
 def parse_tsv(text):
-    """Membaca TSV format baru (6 kolom) dan mengembalikan rows dan metadata."""
     rows = []
     metadata = {}
     lines = text.splitlines()
@@ -524,7 +485,6 @@ def parse_tsv(text):
 
     header_line = lines[0].lower().strip()
     if not header_line.startswith("plugin\t"):
-        # Fallback for old 2-column format
         if header_line.startswith("plugin_sid"):
             lines = lines[1:]
         for line in lines:
@@ -550,7 +510,7 @@ def parse_tsv(text):
             sid = int(row_data.get("sid", 0))
             row_obj = {"plugin_sid": sid, "event_name": row_data.get("title", "")}
             rows.append(row_obj)
-            if i == 0: # Get metadata from the first data row
+            if i == 0:
                 metadata['plugin'] = row_data.get('plugin')
                 metadata['id'] = int(row_data.get('id', 0))
                 metadata['category'] = row_data.get('category')
@@ -560,16 +520,13 @@ def parse_tsv(text):
     return rows, metadata
 
 def render_tsv(rows, siem_plugin_type, plugin_id, category, kingdom):
-    """Merender konten TSV sebagai string dengan format 6 kolom."""
     rows = sorted(rows, key=lambda r: int(r.get("plugin_sid", 0)))
     
     try:
-        unicode # Cek apakah ini Py2
+        unicode 
         
-        # --- Python 2 Logic ---
         out = [u"plugin\tid\tsid\ttitle\tcategory\tkingdom"]
         
-        # Pastikan category/kingdom adalah unicode
         if isinstance(category, str):
             try: cat_u = category.decode("utf-8")
             except Exception: cat_u = category.decode("latin-1", "ignore")
@@ -586,15 +543,12 @@ def render_tsv(rows, siem_plugin_type, plugin_id, category, kingdom):
             plugin = unicode(siem_plugin_type or u"")
             pid = unicode(plugin_id or u"")
             sid = unicode(r.get("plugin_sid", u""))
-            # Perbaikan utama: cast ke unicode(), bukan str()
             title = unicode(r.get("event_name", u"")).replace(u"\t", u" ")
-            
             out.append(u"{}\t{}\t{}\t{}\t{}\t{}".format(plugin, pid, sid, title, cat_u, king_u))
         
         return u"\n".join(out) + u"\n"
 
     except NameError:
-        # --- Python 3 Logic ---
         out = ["plugin\tid\tsid\ttitle\tcategory\tkingdom"]
         for r in rows:
             plugin = str(siem_plugin_type or "")
@@ -632,13 +586,10 @@ def build_filters(filters):
             out.append({"term":{f["field"]: f["value"]}})
     return out
 
-# Di file: main.py
-
 def build_query(field_name, size, filters, time_range=None):
     q={"size":0,"aggs":{"event_names":{"terms":{"field":field_name,"size":size}}}}
     mf=build_filters(filters)
     
-    # --- TAMBAHKAN BLOK INI ---
     if time_range:
         try:
             range_filter = {
@@ -652,13 +603,12 @@ def build_query(field_name, size, filters, time_range=None):
             mf.append(range_filter)
         except KeyError:
             print("[WARN] Konfigurasi time_range tidak lengkap, diabaikan.")
-    # --- AKHIR BLOK TAMBAHAN ---
     
     if mf: q["query"]={"bool":{"filter":mf}}
     return q
 
 def do_request(url, field_name, size, filters, auth, time_range=None):
-    body=build_query(field_name, size, filters, time_range=time_range) # <-- UBAH BARIS INI
+    body=build_query(field_name, size, filters, time_range=time_range)
     return requests.post(url, auth=auth, headers={"Content-Type":"application/json"},
                          data=json.dumps(body), timeout=TIMEOUT, verify=VERIFY_TLS)
 
@@ -769,9 +719,7 @@ def collect_field_mappings(cfg, use_remote_defaults, directive_category=None, fu
     mappings = {}
     print("\n=== Isian Field Mapping (H/F) ===")
 
-    # This function handles the new default logic for specified fields.
     def get_mapping_with_defaults(key, default_field=None):
-        # Define the special defaults requested by the user
         special_defaults = {
             "sensor": {"mode": "f", "value": "resource.labels.project_id"},
             "product": {"mode": "h", "value": "GCP - Audit"},
@@ -785,12 +733,9 @@ def collect_field_mappings(cfg, use_remote_defaults, directive_category=None, fu
         v_default = cfg.get(key + "_value")
 
         if (use_remote_defaults or AUTO_USE_CONFIG) and m_default in ("h", "f") and v_default is not None:
-            # --- PERUBAHAN: Gunakan nilai dari preset/cfg tanpa bertanya ---
             print(u"[PRESET/CFG] {} -> mode: {}, value: {}".format(key, m_default, v_default))
             return m_default, v_default
-            # --- AKHIR PERUBAHAN ---
 
-        # Get the special default for the current key, if it exists
         key_defaults = special_defaults.get(key)
         default_mode = key_defaults["mode"] if key_defaults else (m_default if m_default in ("h", "f") else None)
 
@@ -798,7 +743,6 @@ def collect_field_mappings(cfg, use_remote_defaults, directive_category=None, fu
         
         while True:
             placeholder = ""
-            # Determine the placeholder text based on the mode and available defaults
             if mode == 'f':
                 default_val = (key_defaults and key_defaults.get("value")) or default_field
                 placeholder = " (default: {})".format(default_val) if default_val else ""
@@ -808,7 +752,6 @@ def collect_field_mappings(cfg, use_remote_defaults, directive_category=None, fu
 
             val = py_input("{} value{}: ".format(key, placeholder)).strip()
 
-            # If the user just presses Enter, apply the default
             if not val:
                 if mode == 'f':
                     val = (key_defaults and key_defaults.get("value")) or default_field
@@ -837,14 +780,12 @@ def collect_field_mappings(cfg, use_remote_defaults, directive_category=None, fu
             print("[AUTO] Protocol diisi otomatis: hardcoded 'TCP'")
             mappings[key] = {"mode": "h", "value": "TCP"}
         else:
-            # Use the new function with built-in defaults
             mode, value = get_mapping_with_defaults(key, default_field=default)
             mappings[key] = {"mode": mode, "value": value}
 
 
     print("\n=== Custom Data (label = hardcoded, data = field) ===")
     custom_data = {}
-    # Define the new defaults for custom data
     custom_defaults = {
         1: {"label": "Severity", "value": "severity"},
         2: {"label": "Project ID", "value": "resource.labels.project_id"},
@@ -855,21 +796,17 @@ def collect_field_mappings(cfg, use_remote_defaults, directive_category=None, fu
         label_key = "custom_label" + str(i)
         data_key = "custom_data" + str(i)
         
-        # Get remote config value OR the new default
         label_val_default = cfg.get(label_key) or custom_defaults[i]["label"]
         data_val_default = cfg.get(data_key) or custom_defaults[i]["value"]
         
         if use_remote_defaults or AUTO_USE_CONFIG:
-            # --- PERUBAHAN: Gunakan nilai dari preset/cfg tanpa bertanya ---
             label_val = label_val_default
             data_val = data_val_default
             if not label_val or not data_val:
                     raise SystemExit("[CFG ERROR] {}/{} belum ada di config.json/preset".format(label_key, data_key))
             print(u"[PRESET/CFG] {} = {}".format(label_key, label_val))
             print(u"[PRESET/CFG] {} = {}".format(data_key, data_val))
-            # --- AKHIR PERUBAHAN ---
         else:
-            # Prompt the user, using the new default if they enter nothing
             label_val = py_input("{} (literal, default: {}): ".format(label_key, label_val_default)).strip() or label_val_default
             data_val = py_input("{} (field, default: {}): ".format(data_key, data_val_default)).strip() or data_val_default
         
@@ -882,9 +819,7 @@ def collect_field_mappings(cfg, use_remote_defaults, directive_category=None, fu
             raise SystemExit("[CFG ERROR] timestamp_field belum ada di config.json/preset.")
         ts_in = py_input("Field timestamp (default: timestamp): ").strip() or "timestamp"
     else:
-        # --- PERUBAHAN: Tampilkan nilai preset/cfg ---
         print(u"[PRESET/CFG] timestamp_field: {}".format(ts_in))
-        # --- AKHIR PERUBAHAN ---
 
     return {"mappings": mappings, "custom": custom_data, "timestamp_field": ts_in}
 
@@ -892,20 +827,17 @@ def collect_field_mappings(cfg, use_remote_defaults, directive_category=None, fu
 def generate_file_vector_from_template(tsv_path, template_path, out_dir,
                                          log_type_auto, event_field_no_keyword, spt,
                                          filters, field_data, forced_plugin_id,
-                                         out_conf_name): # module_slug dihapus dari sini
+                                         out_conf_name): 
     
     print("- Template          : {}".format(template_path))
     plugin_id = int(forced_plugin_id)
     if not os.path.exists(template_path): raise SystemExit("[ERROR] Template tidak ditemukan: {}".format(template_path))
     tpl = read_template(template_path)
 
-    # --- Logika Filter VRL (tanpa .type) ---
     vrl_filter_parts = []
     
-    # 1. Langsung ke kondisi match() untuk index_name
     vrl_filter_parts.append("match(string!(.index_name), r'(?i){}')".format(log_type_auto))
 
-    # 2. Tambahkan kondisi dari collect_filters
     for f in filters:
         field_name = f["field"]
         if field_name.endswith(".keyword"):
@@ -916,15 +848,13 @@ def generate_file_vector_from_template(tsv_path, template_path, out_dir,
 
         if f["op"] == "contains":
             condition = 'contains({}, {})'.format(field, value)
-        else: # 'term'
+        else: 
             condition = '{} == {}'.format(field, value)
         vrl_filter_parts.append(condition)
 
-    # 3. Tambahkan kondisi exists() untuk field event utama
     vrl_filter_parts.append('exists({})'.format(to_vrl_accessor(event_field_no_keyword)))
     
     vrl_filter = " && ".join(vrl_filter_parts)
-    # --- Akhir Logika Filter ---
 
     tpl = tpl.replace("{siem_plugin_type}", spt)
     tpl = tpl.replace("{log_type}", log_type_auto)
@@ -935,18 +865,14 @@ def generate_file_vector_from_template(tsv_path, template_path, out_dir,
         "timestamp_field": field_data["timestamp_field"]
     }
 
-    # [PERBAIKAN] Logika untuk menangani integer hardcoded
     integer_fields = ["src_port", "dst_port"]
     for key, val_obj in field_data["mappings"].items():
         mode, value = val_obj["mode"], val_obj["value"]
         placeholder = "{" + key + "}"
         if mode == 'h':
-            # Cek apakah field ini harus integer DAN nilainya adalah angka
             if key in integer_fields and (value or "").isdigit():
-                # Tulis sebagai angka, tanpa tanda kutip
                 tpl = tpl.replace(placeholder, str(value or 0))
             else:
-                # Untuk field lain, tetap gunakan kutip
                 tpl = tpl.replace(placeholder, to_hard_literal(value))
         else:
             tpl = tpl.replace(placeholder, to_vrl_accessor(value))
@@ -999,13 +925,10 @@ def generate_file70_from_template(tsv_path, template_path, out_dir,
         if mode == 'h':
             tpl = tpl.replace(placeholder, to_hard_literal(value))
         else:
-            # FIX from previous error: ensure value is a string before interpolation
             tpl = tpl.replace(placeholder, field_to_interp(value or ""))
         
-        # --- PERBAIKAN TYPO DI SINI ---
         file70_cfg_out[key+"_mode"] = mode
         file70_cfg_out[key+"_value"] = value
-        # --- AKHIR PERBAIKAN TYPO ---
 
     for i in range(1, 4):
         label_key = "custom_label" + str(i)
@@ -1013,28 +936,26 @@ def generate_file70_from_template(tsv_path, template_path, out_dir,
         label_val = field_data["custom"].get(label_key)
         data_val = field_data["custom"].get(data_key)
         tpl = tpl.replace("{" + label_key + "}", to_hard_literal(label_val))
-        # FIX from previous error: ensure value is a string before interpolation
         tpl = tpl.replace("{" + data_key + "}", field_to_interp(data_val or ""))
         file70_cfg_out[label_key] = label_val
         file70_cfg_out[data_key] = data_val
 
-    # V-- THIS IS THE FIX FOR THE TRACEBACK --V
     import io
     try:
         with io.open(tsv_path, 'r', encoding='utf-8') as f:
             tsv_content = f.read()
         rows, _ = parse_tsv(tsv_content)
     except Exception as e:
-        # --- PERUBAHAN: Izinkan lanjut walau TSV (mungkin) kosong ---
         print("[WARN] Gagal membaca file TSV {}: {}. Akan lanjut dengan list kosong.".format(tsv_path, e))
         rows = []
-    # ^-- END OF FIX --^
     
     json_name = "{}_plugin-sids.json".format(spt)
     local_json_path = os.path.join(out_dir, json_name)
     write_json_dictionary(local_json_path, rows)
 
-    final_server_json_path = os.path.join(LOGSTASH_JSON_DICT_DIR, json_name)
+    # --- PERBAIKAN: Gunakan HOST_DIR (isi: /etc/...) untuk config file ---
+    final_server_json_path = os.path.join(LOGSTASH_JSON_HOST_DIR, json_name) 
+    # ---------------------------------------------------------------------
     
     tpl = tpl.replace("{dictionary_path}", final_server_json_path.replace("\\", "/"))
     tpl = tpl.replace("{refresh_interval}", str(DICT_REFRESH_INTERVAL))
@@ -1045,9 +966,6 @@ def generate_file70_from_template(tsv_path, template_path, out_dir,
     tpl = tpl.replace("{siem_plugin_type}", spt)
     tpl = tpl.replace("{src_index_pattern}", index_pattern)
     
-    # FIX for timestamp field replacement
-    # The template should use a simple placeholder like {timestamp}
-    # And the script should replace it with the correct Logstash accessor
     tpl = tpl.replace("{timestamp}", to_logstash_accessor(ts_in))
 
     source_if = build_source_if(log_type_auto, event_field_no_keyword, filters_for_if)
@@ -1093,7 +1011,6 @@ def load_directive_rules():
     if os.path.exists(rule_file):
         try:
             with open(rule_file, 'r') as f:
-                # Menggunakan object_pairs_hook untuk menjaga urutan dari file JSON
                 templates = json.load(f, object_pairs_hook=OrderedDict)
         except Exception as e:
             print("[WARN] Gagal load template dari {}: {}".format(rule_file, e))
@@ -1152,7 +1069,6 @@ def build_manual_rules(plugin_id, title, sid):
     return rules
 
 def get_rule_template(template_name="default", plugin_id=None, sid=None, title=""):
-    # Menggunakan OrderedDict untuk menjaga urutan field/key
     templates = {
         "default": [
             OrderedDict([
@@ -1231,12 +1147,10 @@ def build_directive_entry(plugin_id, header, category, kingdom, disabled_lit, ti
         all_templates = load_directive_rules()
         template_rules = all_templates.get(template_id, [])
         for rule in template_rules:
-            # Lakukan substitusi placeholder
             rule_str = json.dumps(rule)
             rule_str = rule_str.replace('"{PLUGIN_ID}"', str(plugin_id))
             rule_str = rule_str.replace('["{SID}"]', '[{}]'.format(sid))
             rule_str = rule_str.replace("{TITLE}", title)
-            # Muat kembali sebagai OrderedDict
             processed_rule = json.loads(rule_str, object_pairs_hook=OrderedDict)
             rules_data.append(processed_rule)
     else:
@@ -1244,12 +1158,9 @@ def build_directive_entry(plugin_id, header, category, kingdom, disabled_lit, ti
         
     rules_list = [order_rule_fields(r) for r in rules_data]
     
-    # --- Perbaikan Kunci: Definisikan urutan outer key secara eksplisit ---
     directive_obj = OrderedDict()
     directive_obj["id"] = alarm_id_val
-    # --- AWAL PERBAIKAN 1 ---
     directive_obj["name"] = u"{}, {}".format(header, title)
-    # --- AKHIR PERBAIKAN 1 ---
     directive_obj["category"] = category
     directive_obj["kingdom"] = kingdom
     directive_obj["priority"] = 3
@@ -1259,7 +1170,6 @@ def build_directive_entry(plugin_id, header, category, kingdom, disabled_lit, ti
     
     return directive_obj
 
-# --- MODIFIKASI: Tambahkan argumen preset_answers ---
 def append_or_create_directive(meta_path, cfg_dir, registry, use_remote_defaults=False, out_filename=None, preset_answers=None):
     if preset_answers is None: preset_answers = {}
     
@@ -1268,7 +1178,6 @@ def append_or_create_directive(meta_path, cfg_dir, registry, use_remote_defaults
 
     tsv_path = meta.get("tsv_path")
     if not tsv_path or not os.path.exists(tsv_path): 
-        # --- PERUBAHAN: Izinkan lanjut walau TSV tidak ada ---
         print("[WARN] TSV tidak ditemukan: {}. File directive akan dibuat kosong.".format(tsv_path))
         rows = []
     else:
@@ -1277,7 +1186,6 @@ def append_or_create_directive(meta_path, cfg_dir, registry, use_remote_defaults
         except Exception as e:
             print("[WARN] Gagal membaca TSV {}: {}. File directive akan dibuat kosong.".format(tsv_path, e))
             rows = []
-    # --- AKHIR PERUBAHAN ---
 
     spt = meta.get("siem_plugin_type") or "directive"
     plugin_id_final = meta.get("plugin_id")
@@ -1286,17 +1194,14 @@ def append_or_create_directive(meta_path, cfg_dir, registry, use_remote_defaults
     DICTIONARY = { r["event_name"]: int(r["plugin_sid"]) for r in rows }
     pairs = dict_items_sorted_by_sid(DICTIONARY)
 
-    # cfg_dir sudah berisi data dari preset atau remote
     default_header = cfg_dir.get("HEADER") or default_header_from_spt(spt)
     default_category = cfg_dir.get("CATEGORY") or "Lateral Movement"
     default_kingdom  = cfg_dir.get("KINGDOM")  or "Internal Spearphishing"
-    default_disabled = cfg_dir.get("DISABLED", True) # Default disabled True jika tidak ada di cfg
+    default_disabled = cfg_dir.get("DISABLED", True) 
 
-    # --- PERUBAHAN: Cek preset untuk template rules ---
     template_id_preset = preset_answers.get("template_id")
     if template_id_preset:
         print(u"[PRESET] Menggunakan Template Rules: {}".format(template_id_preset))
-        # Validasi apakah template_id_preset ada
         all_templates_check = load_directive_rules()
         if template_id_preset in all_templates_check:
             rule_template, template_file, template_id = "file", None, template_id_preset
@@ -1304,13 +1209,10 @@ def append_or_create_directive(meta_path, cfg_dir, registry, use_remote_defaults
             print(u"[WARN] Preset template_id '{}' tidak ditemukan di directive_rules.json. Fallback ke manual.".format(template_id_preset))
             rule_template, template_file, template_id = ask_rule_template()
     else:
-        # Jika tidak ada preset, otomatis pilih "default" (mode non-interaktif)
         print(u"[PRESET] Tidak ada 'template_id' di preset. Menggunakan 'default' 3 stages.")
         rule_template, template_file, template_id = "default", None, None
-    # --- AKHIR PERUBAHAN ---
     
     print("\n=== KONFIGURASI DIRECTIVE ===")
-    # HEADER, CATEGORY, KINGDOM sudah di-handle di main() dan ada di dalam cfg_dir
     HEADER = default_header
     CATEGORY = default_category
     KINGDOM = default_kingdom
@@ -1318,9 +1220,8 @@ def append_or_create_directive(meta_path, cfg_dir, registry, use_remote_defaults
     print(u"[PRESET/CFG] CATEGORY: {}".format(CATEGORY))
     print(u"[PRESET/CFG] KINGDOM: {}".format(KINGDOM))
 
-    # --- AWAL PERUBAHAN: Dekode string (jika Py2) ---
     try:
-        unicode # Cek apakah ini Py2
+        unicode 
         
         if isinstance(HEADER, str):
             try: HEADER = HEADER.decode("utf-8")
@@ -1335,19 +1236,15 @@ def append_or_create_directive(meta_path, cfg_dir, registry, use_remote_defaults
             except Exception: KINGDOM = KINGDOM.decode("latin-1", "ignore")
             
     except NameError:
-        pass # Ini Py3, semua string sudah unicode (str)
-    # --- AKHIR PERUBAHAN ---
+        pass 
         
-    # --- PERUBAHAN: Cek preset untuk status DISABLED ---
-    DISABLED_ans_preset = preset_answers.get("DISABLED") # e.g., "y" or "n"
+    DISABLED_ans_preset = preset_answers.get("DISABLED") 
     if DISABLED_ans_preset and DISABLED_ans_preset.lower() in ("y", "n"):
         print(u"[PRESET] Status Disabled: {}".format(DISABLED_ans_preset))
         DISABLED_ans = DISABLED_ans_preset.lower()
     else:
-        # Jika tidak ada di preset, default ke "y" (disabled=True)
         print(u"[PRESET] 'DISABLED' tidak di-set di preset. Default ke 'y' (True).")
         DISABLED_ans = "y"
-    # --- AKHIR PERUBAHAN ---
     
     DISABLED = default_disabled if not DISABLED_ans else (DISABLED_ans in ("y","yes","true","1"))
 
@@ -1402,7 +1299,6 @@ def run_cmd(cmd, cwd=None):
         print("[EXEC ERROR] {} -> {}".format(cmd, e))
         return 1
 
-# --- MODIFIKASI: Tambahkan argumen preset_answers ---
 def distribute_artifacts(conf_meta, directive_path, preset_answers=None):
     if preset_answers is None: preset_answers = {}
     any_distributed = False
@@ -1412,14 +1308,12 @@ def distribute_artifacts(conf_meta, directive_path, preset_answers=None):
     conf_path_vector = conf_meta.get("conf_path_vector")
     
     if conf_path_70 and os.path.exists(conf_path_70):
-        # --- PERUBAHAN: Cek preset ---
         ans = preset_answers.get("distribute_70")
         if ans and ans.lower() == "y":
              print(u"[PRESET] Distribute file 70: y")
         else:
              print(u"[PRESET] Distribute file 70: n (atau tidak diset)")
              ans = "n"
-        # --- AKHIR PERUBAHAN ---
         
         if ans.lower() == "y":
             if not os.path.isdir(LOGSTASH_PIPE_DIR):
@@ -1435,33 +1329,32 @@ def distribute_artifacts(conf_meta, directive_path, preset_answers=None):
     else:
         print("[DIST] File 70 (Logstash) tidak tersedia (skip).")
 
-    # Distribute JSON dictionary (optional)
     json_path = conf_meta.get("json_dict_path")
     if json_path and os.path.exists(json_path):
-        # --- PERUBAHAN: Cek preset ---
         ans_json = preset_answers.get("distribute_json")
         if ans_json and ans_json.lower() == "y":
              print(u"[PRESET] Distribute JSON: y")
         else:
              print(u"[PRESET] Distribute JSON: n (atau tidak diset)")
              ans_json = "n"
-        # --- AKHIR PERUBAHAN ---
         
         if ans_json.lower() == "y":
-            if not LOGSTASH_JSON_HOST_DIR:
-                print("[DIST ERROR] LOGSTASH_JSON_HOST_DIR (path host untuk JSON) belum di-set. Skip copy JSON.")
+            # --- PERBAIKAN: Gunakan DICT_DIR (isi: /root/...) untuk target copy ---
+            if not LOGSTASH_JSON_DICT_DIR:
+                print("[DIST ERROR] LOGSTASH_JSON_DICT_DIR (path fisik /root/) belum di-set. Skip copy JSON.")
             else:
                 try:
-                    if not os.path.isdir(LOGSTASH_JSON_HOST_DIR):
-                        print("[DIST] Creating directory: {}".format(LOGSTASH_JSON_HOST_DIR))
-                        os.makedirs(LOGSTASH_JSON_HOST_DIR)
+                    if not os.path.isdir(LOGSTASH_JSON_DICT_DIR):
+                        print("[DIST] Creating directory: {}".format(LOGSTASH_JSON_DICT_DIR))
+                        os.makedirs(LOGSTASH_JSON_DICT_DIR)
                     
-                    dst_json = os.path.join(LOGSTASH_JSON_HOST_DIR, os.path.basename(json_path))
+                    dst_json = os.path.join(LOGSTASH_JSON_DICT_DIR, os.path.basename(json_path))
                     shutil.copy2(json_path, dst_json)
                     print("[DIST] Copied JSON dict -> {}".format(dst_json))
                     any_distributed = True
                 except Exception as e:
                     print("[DIST ERROR] Copy JSON gagal: {}".format(e))
+            # ---------------------------------------------------------------------
     else:
         print("[DIST] JSON dictionary tidak tersedia (skip).")
 
@@ -1471,14 +1364,12 @@ def distribute_artifacts(conf_meta, directive_path, preset_answers=None):
         print("[DIST] File Vector tidak tersedia (skip).")
 
     if directive_path and os.path.exists(directive_path):
-        # --- PERUBAHAN: Cek preset ---
         ans2 = preset_answers.get("distribute_directive")
         if ans2 and ans2.lower() == "y":
              print(u"[PRESET] Distribute directive: y")
         else:
              print(u"[PRESET] Distribute directive: n (atau tidak diset)")
              ans2 = "n"
-        # --- AKHIR PERUBAHAN ---
 
         if ans2.lower() == "y":
             cmd = ["kubectl","cp", directive_path, "{}:/dsiem/configs/".format(FRONTEND_POD)]
@@ -1492,20 +1383,17 @@ def distribute_artifacts(conf_meta, directive_path, preset_answers=None):
         print("[DIST] Directive JSON tidak tersedia (skip).")
     return any_distributed
 
-# --- MODIFIKASI: Tambahkan argumen preset_answers ---
 def maybe_restart_system(did_distribute, preset_answers=None):
     if preset_answers is None: preset_answers = {}
     print("\n=== RESTART / ROLL ===")
     
-    # --- PERUBAHAN: Cek preset ---
-    ans_restart_preset = preset_answers.get("restart") # e.g., "y" or "n"
+    ans_restart_preset = preset_answers.get("restart") 
     if ans_restart_preset and ans_restart_preset.lower() == "y":
         print(u"[PRESET] Restart: y")
         ans = "y"
     else:
         print(u"[PRESET] Restart: n (atau tidak diset)")
         ans = "n"
-    # --- AKHIR PERUBAHAN ---
         
     if ans.lower() != "y": 
         print("[RESTART] Dibatalkan."); 
@@ -1524,31 +1412,21 @@ def maybe_restart_system(did_distribute, preset_answers=None):
     if rc == 0: print("[RESTART] Pod dihapus. Kubernetes akan recreate otomatis.")
     else: print("[RESTART] Gagal menghapus pod (cek kubectl context/permission).")
 
-# ====== FUNGSI BARU UNTUK MEMPROSES PRESET TUNGGAL ======
-
 def process_preset(preset_name, preset_config, auth):
-    """
-    Fungsi ini berisi logika utama untuk memproses satu preset.
-    Dipindahkan dari 'main' agar bisa dipanggil dalam loop.
-    """
     print(u"\n=======================================================")
     print(u"=== MEMPROSES PRESET: {} ===".format(preset_name))
     print(u"=======================================================")
 
-    # --- Bagian 1: Pengumpulan Input dari Pengguna (Sekarang menggunakan preset) ---
-    
-    # Ambil semua bagian dari preset
     preset_creator = preset_config.get("creator", {})
     preset_plugin = preset_config.get("plugin", {})
     preset_directive = preset_config.get("directive", {})
     preset_mappings = preset_config.get("mappings", {})
     preset_dist = preset_config.get("distribution", {})
-    use_local_preset = True # Kita asumsikan True karena ini dipanggil dari loop preset
+    use_local_preset = True 
 
-    # Validasi preset
     if not preset_creator or not preset_directive or not preset_mappings:
         print(u"[ERROR] Preset '{}' tidak lengkap (missing 'creator'/'directive'/'mappings').".format(preset_name))
-        return # Lanjut ke preset berikutnya
+        return 
 
     device_name = preset_creator.get("device_name")
     log_type_auto = sanitize(device_name)
@@ -1576,31 +1454,28 @@ def process_preset(preset_name, preset_config, auth):
     module_slug = preset_creator.get("module_slug")
     submodule_slug = preset_creator.get("submodule_slug")
     
-    if module_slug is None: # Jika preset tidak ada
+    if module_slug is None: 
         guess_mod, guess_sub = guess_module_from_field(field_name)
         module_slug, submodule_slug = guess_mod, guess_sub
-    else: # Jika preset ada
+    else: 
         print(u"[PRESET] Module: {}".format(module_slug))
         print(u"[PRESET] Submodule: {}".format(submodule_slug or "(none)"))
 
-    # Gunakan filter dari preset
     if "filters" in preset_creator and isinstance(preset_creator["filters"], list):
         filters = preset_creator["filters"]
         print("[PRESET] Menggunakan filter:")
         for f in filters:
             print("  - {} {} '{}'".format(f["field"], f.get("op", "term"), f["value"]))
     else:
-        filters = [] # Tidak ada filter jika tidak diset
+        filters = [] 
 
-    # --- SELALU 'FULL TIME' ---
     time_range_config = None
     print("\n=== PENGATURAN RENTANG WAKTU ===")
     print("[INFO] Skrip diatur untuk menarik 'Full Time'.")
 
     url = "{}/{}/_search".format(ES_HOST.rstrip("/"), index_pattern)
 
-    # --- Bagian 2: Query ke OpenSearch dengan Fallback ---
-    data = {} # Inisialisasi data di luar try-except
+    data = {} 
     try:
         print("\n[QUERY] Menjalankan agregasi terms untuk field: '{}'".format(field_name))
         r = None
@@ -1674,7 +1549,6 @@ def process_preset(preset_name, preset_config, auth):
     translate_field_no_kw = field_name.replace(".keyword", "")
     filter1_slug = slug(f1_val)
     
-    # --- Bagian 3: Sinkronisasi TSV dan Plugin ID dengan GitHub ---
     print("\n[SYNC] GitHub repo: {}  branch: {}".format(GITHUB_REPO, GITHUB_BRANCH))
     ghp = gh_paths(log_type_auto, module_slug, submodule_slug, filter1_slug)
 
@@ -1712,20 +1586,20 @@ def process_preset(preset_name, preset_config, auth):
     print("\n[SYNC] Target dict TSV: {}".format(ghp["tsv"]))
     new_events = [r["event_name"] for r in rows]
     existing_file = gh_get_file(ghp["tsv"])
-    added = [] # Inisialisasi 'added'
+    added = [] 
 
     if existing_file is None:
-        rows_for_local = rows[:] # Ini akan jadi [] jika query gagal
+        rows_for_local = rows[:] 
         if not rows_for_local:
              print("[SYNC] Kamus pusat BELUM ada dan query GAGAL. Akan membuat TSV kosong.")
         else:
              print("[SYNC] Kamus pusat BELUM ada -> create versi pertama.")
-             added = new_events # Jika baru, semua event dianggap 'added'
+             added = new_events 
     else:
         try: old_text = base64.b64decode(existing_file.get("content","")).decode("utf-8", "replace")
         except Exception: old_text = ""
         existing_rows, _ = parse_tsv(old_text)
-        merged_rows, added = merge_dictionary(existing_rows, new_events) # new_events akan [] jika query gagal
+        merged_rows, added = merge_dictionary(existing_rows, new_events) 
         rows_for_local = merged_rows
         if not added:
             print("[SYNC] Up-to-date. Tidak ada penambahan.")
@@ -1734,7 +1608,6 @@ def process_preset(preset_name, preset_config, auth):
     
     local_tsv = os.path.join(OUT_DIR, "{}_plugin-sids.tsv".format(ghp["full_slug"]))
     
-    # --- Bagian 4: Generate Artefak Lokal (TSV, .conf, .yaml, directive, etc.) ---
     cfg_remote = {}
     config_file = gh_get_file(ghp["config"])
     if config_file:
@@ -1744,10 +1617,8 @@ def process_preset(preset_name, preset_config, auth):
         except Exception: cfg_remote = {}
     else: print("[CFG] Belum ada config remote di GitHub.")
 
-    # Gabungkan remote (jika ada) dengan preset (jika dipilih)
     config_for_mappings = deep_merge(cfg_remote.get("mappings", {}), preset_mappings)
     
-    # Tentukan directive (Category/Kingdom)
     directive_cfg_default = deep_merge(cfg_remote.get("directive", {}), preset_directive)
     
     default_category = directive_cfg_default.get("CATEGORY") or "Internal Spearphishing"
@@ -1758,16 +1629,14 @@ def process_preset(preset_name, preset_config, auth):
     print(u"[PRESET] Category: {}".format(directive_category))
     print(u"[PRESET] Kingdom:  {}".format(directive_kingdom))
 
-    # Tulis TSV dengan data directive yang sudah ditentukan
     write_tsv(local_tsv, rows_for_local, spt, plugin_id_final, directive_category, directive_kingdom)
     print("\n[OK] Saved TSV -> {}".format(local_tsv))
     
     print("\n=== GENERATE KONFIGURASI ===")
     
-    # Panggil collect_field_mappings
     field_data = collect_field_mappings(
         config_for_mappings, 
-        use_remote_defaults=True, # Paksa True karena ini mode batch
+        use_remote_defaults=True, 
         directive_category=directive_category, 
         full_slug=ghp["full_slug"]
     )
@@ -1799,9 +1668,8 @@ def process_preset(preset_name, preset_config, auth):
     final_directive_config = deep_merge(cfg_remote.get("directive", {}), preset_directive)
     final_directive_config = deep_merge(final_directive_config, {"CATEGORY": directive_category, "KINGDOM": directive_kingdom})
 
-    ans2_preset = preset_directive.get("generate_directive") # e.g., "y" or "n"
+    ans2_preset = preset_directive.get("generate_directive") 
     
-    # Jika tidak diset di preset, default ke "y"
     if not ans2_preset or ans2_preset.lower() not in ("y", "n"):
         print(u"[PRESET] 'generate_directive' tidak di-set. Default ke 'y'.")
         ans2 = "y"
@@ -1814,14 +1682,13 @@ def process_preset(preset_name, preset_config, auth):
         dir_out_local = "directives_{}_{}.json".format(BACKEND_POD, ghp["full_slug"])
         directive_cfg_out, directive_out_path = append_or_create_directive(
             META_PATH, 
-            final_directive_config, # Ini berisi HEADER, CATEGORY, KINGDOM
+            final_directive_config, 
             registry, 
             use_remote_defaults=True, 
             out_filename=dir_out_local,
-            preset_answers=preset_directive # Teruskan preset
+            preset_answers=preset_directive 
         )
     
-    # --- Bagian 5: Push Semua Artefak ke GitHub ---
     if added:
         tsv_text_to_push = render_tsv(rows_for_local, spt, plugin_id_final, directive_category, directive_kingdom)
         gh_put_file(ghp["tsv"], tsv_text_to_push.encode("utf-8"), "Update dict: {}/{}".format(GITHUB_REPO, ghp["tsv"]), sha=existing_file.get("sha") if existing_file else None)
@@ -1861,7 +1728,6 @@ def process_preset(preset_name, preset_config, auth):
         gh_put_file(ghp["directive"], dir_bytes, "Upload directive: {}".format(ghp["directive"]), sha=existing_dir.get("sha") if existing_dir else None)
         print("[PUSH] Uploaded directive:", ghp["directive"])
 
-    # --- Bagian 6: Generate dan Push file updater.json ---
     updater_context = {
         "es_host": ES_HOST, "verify_tls": VERIFY_TLS, "timeout": TIMEOUT,
         "es_passwd_file": ES_PASSWD_FILE, "es_user_lookup": ES_USER_LOOKUP,
@@ -1884,20 +1750,17 @@ def process_preset(preset_name, preset_config, auth):
         gh_put_file(gh_updater_path, updater_bytes, "Upload/Update updater config: {}".format(gh_updater_path), sha=existing_updater.get("sha") if existing_updater else None)
         print("[PUSH] Berhasil mengunggah: {}".format(gh_updater_path))
     
-    # --- Bagian 7: Registrasi Plugin ID Baru (jika ada) ---
     if is_new_plugin:
         registry = registry_append(registry, plugin_id_final, log_type_auto, module_slug, submodule_slug, filter1_slug, spt)
         gh_push_plugin_registry(registry, sha=reg_sha, msg="Add plugin_id {} for {}".format(plugin_id_final, ghp["full_slug"]))
         print("[REGISTRY] plugin_id {} didaftarkan.".format(plugin_id_final))
 
-    # --- Bagian 8: Distribusi Lokal dan Restart (Gunakan preset_dist) ---
     did_dist = distribute_artifacts(conf_meta, directive_out_path, preset_answers=preset_dist)
     maybe_restart_system(did_dist, preset_answers=preset_dist)
     
     print(u"\n=== SELESAI PRESET: {} ===".format(preset_name))
 
 
-# ====== MAIN ======
 def main():
     require_github()
     ensure_credentials_file(ES_PASSWD_FILE)
@@ -1909,9 +1772,7 @@ def main():
     print("- Verify TLS: {}".format(VERIFY_TLS))
     print("- Timeout   : {}s".format(TIMEOUT))
     
-    # --- BLOK UTAMA: LOOPING SEMUA PRESET ---
-    
-    presets = load_plugin_presets() # Ini memuat "plugin_presets.json"
+    presets = load_plugin_presets() 
     
     if not presets:
         print("\n[FATAL] File 'plugin_presets.json' tidak ditemukan atau kosong. Tidak ada yang bisa diproses.")
@@ -1927,11 +1788,10 @@ def main():
             process_preset(preset_name, preset_config, auth)
             success_count += 1
         except Exception as e:
-            # Tangkap semua error agar loop tidak berhenti
             print(u"\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             print(u"[FATAL ERROR] Gagal memproses preset '{}': {}".format(preset_name, e))
             import traceback
-            traceback.print_exc() # Cetak traceback untuk debugging
+            traceback.print_exc() 
             print(u"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             fail_count += 1
     
