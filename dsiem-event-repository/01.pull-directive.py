@@ -476,12 +476,18 @@ def find_plugins_in_parent(parent_path, current_path=""):
     if not isinstance(items, list): return []
 
     found_plugins = []
+    
+    # [LOGIC BARU]
+    # Cek apakah folder ini punya ciri-ciri plugin (ada config.json ATAU ada file .tsv)
     has_config = any(item.get('type') == 'file' and item.get('name') == 'config.json' for item in items)
-    has_subdirs = any(item.get('type') == 'dir' for item in items)
+    has_tsv = any(item.get('type') == 'file' and item.get('name', '').endswith('_plugin-sids.tsv') for item in items)
 
-    if has_config and not has_subdirs: 
+    # Kuncinya disini: KITA HAPUS "and not has_subdirs"
+    # Jadi mau dia punya anak atau cucu, kalo dia punya file config/tsv, dia dianggap plugin.
+    if has_config or has_tsv: 
         found_plugins.append(full_path)
 
+    # Tetep cari ke dalem buat listing submodul lainnya
     for item in items:
         if item.get('type') == 'dir':
             new_relative_path = os.path.join(current_path, item['name']).replace("\\", "/")
@@ -620,45 +626,66 @@ def display_summary(selection):
 
 # ====== FUNGSI PROSES & DISTRIBUSI ======
 def process_plugin(plugin_path):
-    print_header("Mengunduh Plugin: {}".format(plugin_path))
-    parts = plugin_path.split('/');
-    if not parts: return None
+    print_header("Mengunduh Plugin (Files Only): {}".format(plugin_path))
+    
+    # Ambil daftar isi folder dari GitHub
+    items = gh_api_get(plugin_path)
+    if not isinstance(items, list): return None
 
-    slug_found = None
-    items_in_dir = gh_api_get(plugin_path)
-    if isinstance(items_in_dir, list):
-         for item in items_in_dir:
-              if item.get('type') == 'file' and item.get('name','').endswith('_plugin-sids.tsv'):
-                   slug_found = item['name'].replace('_plugin-sids.tsv', '')
-                   break
-    if not slug_found:
-        print("[WARN] Gagal menentukan 'full_slug' di {}. Dilewati.".format(plugin_path))
-        return None
-    full_slug = slug_found
-    print("[INFO] Ditemukan 'full_slug': {}".format(full_slug))
     local_plugin_dir = os.path.join(OUT_DIR, plugin_path)
-    
-    paths_to_download = {
-        "tsv":         "{}_plugin-sids.tsv".format(full_slug),
-        "updater_cfg": "{}_updater.json".format(full_slug),
-        "json_dict":   "{}_plugin-sids.json".format(full_slug),
-        "directive":   "directives_{}_{}.json".format(BACKEND_POD, full_slug),
-        "conf70":      "70_dsiem-plugin_{}.conf".format(full_slug),
-        "vector_conf": "70_transform_dsiem-plugin-{}.yaml".format(full_slug),
-    }
-    downloaded_files = {"full_slug": full_slug, "path": plugin_path}
+    safe_makedirs(local_plugin_dir)
+
+    full_slug = None
+    downloaded_files = {"path": plugin_path}
     successful_downloads = 0
-    for key, filename in paths_to_download.items():
-        remote_path = os.path.join(plugin_path, filename).replace("\\", "/")
-        local_path = os.path.join(local_plugin_dir, filename)
-        saved_path, _ = download_and_save(remote_path, local_path)
-        if saved_path: downloaded_files[key] = saved_path; successful_downloads += 1
-    
+
+    # [LOGIC DOWNLOAD "DANGKAL"]
+    for item in items:
+        # Kalo dia FOLDER --> SKIP / ABAIKAN (Sesuai request)
+        if item.get('type') == 'dir':
+            continue 
+            
+        # Kalo dia FILE --> DOWNLOAD
+        if item.get('type') == 'file':
+            remote_file_path = item.get('path')
+            local_file_path = os.path.join(local_plugin_dir, item.get('name'))
+            
+            saved_path, slug_detected = download_and_save(remote_file_path, local_file_path)
+            
+            if saved_path: 
+                successful_downloads += 1
+                # Coba tangkap slug dari file tsv kalo ketemu
+                if slug_detected and not full_slug: full_slug = slug_detected
+                
+                # Mapping file untuk keperluan distribusi nanti
+                fname = item.get('name')
+                if fname.endswith('_updater.json'): downloaded_files["updater_cfg"] = saved_path
+                elif fname.endswith('_plugin-sids.tsv'): downloaded_files["tsv"] = saved_path
+                elif fname.endswith('_plugin-sids.json'): downloaded_files["json_dict"] = saved_path
+                elif fname.startswith('70_dsiem-plugin_') and fname.endswith('.conf'): downloaded_files["conf70"] = saved_path
+                elif fname.startswith('70_transform_') and fname.endswith('.yaml'): downloaded_files["vector_conf"] = saved_path
+                elif fname.startswith('directives_') and fname.endswith('.json'): downloaded_files["directive"] = saved_path
+
+    # Fallback: Kalo slug gak ketemu dari fungsi download (misal tsv gak kedownload), coba cari manual
+    if not full_slug and "tsv" in downloaded_files:
+        full_slug = os.path.basename(downloaded_files["tsv"]).replace('_plugin-sids.tsv', '')
+
+    if not full_slug:
+        # Coba cari dari nama updater json
+        if "updater_cfg" in downloaded_files:
+             full_slug = os.path.basename(downloaded_files["updater_cfg"]).replace('_updater.json', '')
+        else:
+            print("[WARN] Gagal menentukan 'full_slug'. Plugin mungkin tidak lengkap.")
+            return None
+
+    print("[INFO] Ditemukan 'full_slug': {}".format(full_slug))
+    downloaded_files["full_slug"] = full_slug
+
     if "updater_cfg" in downloaded_files:
-        print("[INFO] Unduhan selesai untuk {}. Berhasil {} file.".format(full_slug, successful_downloads))
+        print("[INFO] Unduhan selesai. Total {} file (Subfolder diabaikan).".format(successful_downloads))
         return downloaded_files
     else:
-        print("[ERROR] File krusial '{}_updater.json' gagal diunduh untuk {}. Plugin dilewati.".format(full_slug, plugin_path))
+        print("[ERROR] File krusial '_updater.json' tidak ditemukan di root folder ini.")
         return None
 
 def distribute_logstash(downloaded_files):
