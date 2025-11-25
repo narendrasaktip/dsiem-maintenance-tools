@@ -64,17 +64,24 @@ def safe_save_json(path, obj):
         print("    -> [DRY RUN] Penulisan file dilewati.")
         return True
     try:
-        if isinstance(obj, str):
-             try: unicode; obj = obj.decode('utf-8') if isinstance(obj, str) else obj
-             except NameError: pass
+        # [FIX] Penanganan Unicode yang lebih robust untuk Python 2
+        if isinstance(obj, str) or (sys.version_info[0] < 3 and isinstance(obj, unicode)):
+             try: 
+                if isinstance(obj, unicode): obj = obj
+                else: obj = obj.decode('utf-8')
+             except (NameError, AttributeError, UnicodeError): pass
+             
              with io.open(path, 'w', encoding='utf-8') as f:
                  f.write(obj); f.write(u'\n')
              print("    -> [OK] Berhasil disimpan (Text).")
              return True
              
         json_string = json.dumps(obj, indent=2, sort_keys=True, ensure_ascii=False)
-        try: unicode; json_string = json_string.decode('utf-8') if isinstance(json_string, str) else json_string
-        except NameError: pass
+        
+        # [FIX] Decode bytes ke unicode explicit untuk json dump di Py2
+        try: 
+            if isinstance(json_string, str): json_string = json_string.decode('utf-8')
+        except (NameError, AttributeError, UnicodeError): pass
 
         with io.open(path, 'w', encoding='utf-8') as f:
             f.write(json_string); f.write(u'\n')
@@ -156,28 +163,51 @@ def ask_for_path(prompt, default_value):
 def update_config_sh(paths_to_update):
     CONFIG_SH_PATH = './config.sh'
     print("[CONFIG] Memperbarui {}...".format(CONFIG_SH_PATH))
-    if not os.path.exists(CONFIG_SH_PATH):
-        print("[WARN] config.sh tidak ditemukan. Perubahan tidak akan permanen.")
-        return False
     
+    # Buat file jika belum ada (untuk menghindari error read)
+    if not os.path.exists(CONFIG_SH_PATH):
+        try:
+            with io.open(CONFIG_SH_PATH, 'w', encoding='utf-8') as f:
+                f.write(u"#!/bin/bash\n")
+        except Exception as e:
+            print("[WARN] Gagal membuat config.sh baru: {}".format(e))
+            return False
+
     try:
         with io.open(CONFIG_SH_PATH, 'r', encoding='utf-8') as f: lines = f.readlines()
         new_lines = []; export_re = re.compile(r'^(export\s+)([A-Za-z_][A-Za-z0-9_]+)=("?)(.*?)("?\s*)$')
         updated_keys = set()
         
+        # 1. Update baris yang sudah ada
         for line in lines:
             match = export_re.match(line)
             if match:
                 key = match.group(2)
                 if key in paths_to_update:
                     new_value = paths_to_update[key]
-                    new_line = 'export {}="{}"\n'.format(key, new_value)
+                    # [FIX] Tambahkan 'u' di depan string agar menjadi Unicode
+                    try:
+                        if isinstance(new_value, str): new_value = new_value.decode('utf-8')
+                    except: pass
+                    
+                    new_line = u'export {}="{}"\n'.format(key, new_value)
                     new_lines.append(new_line)
                     updated_keys.add(key)
                     print("    -> Memperbarui {}...".format(key))
                     continue
             new_lines.append(line)
         
+        # 2. Tambahkan variabel baru yang belum ada (APPEND)
+        for key, value in paths_to_update.items():
+            if key not in updated_keys:
+                print("    -> Menambahkan variabel baru: {}".format(key))
+                # [FIX] Decode value jika masih bytes, dan gunakan format string Unicode
+                try:
+                    if isinstance(value, str): value = value.decode('utf-8')
+                except: pass
+                
+                new_lines.append(u'export {}="{}"\n'.format(key, value))
+
         if not DRY_RUN:
             with io.open(CONFIG_SH_PATH, 'w', encoding='utf-8') as f: f.writelines(new_lines)
             print("[CONFIG] {} berhasil diperbarui.".format(CONFIG_SH_PATH))
@@ -195,6 +225,14 @@ def reload_global_paths():
     
     print("[INFO] Memuat ulang variabel path dari environment...")
     
+    # Reload file config.sh agar env vars masuk ke os.environ
+    if os.path.exists("./config.sh"):
+        command = ['bash', '-c', 'source ./config.sh && env']
+        proc = subprocess.Popen(command, stdout=subprocess.PIPE)
+        for line in proc.stdout:
+            (key, _, value) = line.partition(b"=")
+            os.environ[key.decode('utf-8').strip()] = value.decode('utf-8').strip()
+
     LOGSTASH_PIPE_DIR = os.getenv("LOGSTASH_PIPE_DIR")
     LOGSTASH_JSON_DICT_DIR = os.getenv("LOGSTASH_JSON_DICT_DIR")
     LOGSTASH_HOME     = os.getenv("LOGSTASH_HOME")
@@ -217,11 +255,11 @@ def get_active_plugins():
 # FUNGSI PENTING: Mendapatkan status display (Harus sinkron dengan 03.manage_distributed.py)
 def get_status_display_sync(item_needs_dist, item_target):
     if item_target == 'None':
-        return "❌ Target Not Found"
+        return u"❌ Target Not Found"
     elif item_needs_dist:
-        return "⚠️ Local Only"
+        return u"⚠️ Local Only"
     else:
-        return "✅ Active"
+        return u"✅ Active"
 
 def scan_integrations_for_current_customer():
     jobs = load_json_safe('master_jobs.json')
@@ -245,7 +283,7 @@ def scan_integrations_for_current_customer():
         
         # MENGGUNAKAN STATUS SINKRON DENGAN 03.MANAGE_DISTRIBUTED.PY
         status_text = get_status_display_sync(needs_dist, target)
-        notif_str = "AKTIF (Email)" if is_active else "Pasif"
+        notif_str = u"AKTIF (Email)" if is_active else u"Pasif"
 
         try: last_modified = datetime.datetime.fromtimestamp(os.path.getmtime(job_path)).strftime('%Y-%m-%d %H:%M')
         except: last_modified = "N/A"
@@ -298,16 +336,16 @@ def generate_single_markdown_report_sync(cust_data, all_integrations):
     lines = []; timestamp = cust_data['last_updated']
     customer_name = cust_data['customer_name']; integrations_map = cust_data['integrations']
     
-    lines.append("# Status Integrasi SIEM - {}".format(customer_name))
-    lines.append("\n**Waktu Pemrosesan Terakhir:** {}\n".format(timestamp))
-    lines.append("---")
+    lines.append(u"# Status Integrasi SIEM - {}".format(customer_name))
+    lines.append(u"\n**Waktu Pemrosesan Terakhir:** {}\n".format(timestamp))
+    lines.append(u"---")
     
     # === TABEL DETAIL ===
-    lines.append("\n## ⚙️ Detail Integrasi Terdaftar")
+    lines.append(u"\n## ⚙️ Detail Integrasi Terdaftar")
 
     # Kolom baru: Aksi/Status (Menggabungkan kebutuhan pull dan target)
-    header = "| Plugin / Device (Slug) | Target Engine | Status Distribusi | Notifikasi Email | Kesimpulan Aksi Wajib |"
-    separator = "| :--- | :---: | :---: | :---: | :--- |"
+    header = u"| Plugin / Device (Slug) | Target Engine | Status Distribusi | Notifikasi Email | Kesimpulan Aksi Wajib |"
+    separator = u"| :--- | :---: | :---: | :---: | :--- |"
     lines.append(header); lines.append(separator)
 
     # Variabel untuk Kesimpulan Umum
@@ -315,13 +353,13 @@ def generate_single_markdown_report_sync(cust_data, all_integrations):
     none_target_count = sum(1 for item in all_integrations if item['target'] == 'None')
 
     if not integrations_map:
-        lines.append("| *Belum ada integrasi yang terdaftar.* | - | - | - | - |")
+        lines.append(u"| *Belum ada integrasi yang terdaftar.* | - | - | - | - |")
     else:
         sorted_integrations = sorted(all_integrations, key=lambda x: x['slug'])
         for item in sorted_integrations:
              # MENGGUNAKAN LOGIKA STATUS DISPLAY SINKRON DENGAN 03
              status_text = get_status_display_sync(item['needs_dist'], item['target'])
-             notification = item['is_active'] and "🔔 AKTIF" or "🔕 PASIF"
+             notification = item['is_active'] and u"🔔 AKTIF" or u"🔕 PASIF"
              
              # Menentukan Kesimpulan Aksi Wajib Inline
              if item['target'] == 'None':
@@ -331,33 +369,33 @@ def generate_single_markdown_report_sync(cust_data, all_integrations):
              else:
                  action_summary = "N/A"
              
-             row = "| **{}** | {} | {} | {} | **{}** |".format(
+             row = u"| **{}** | {} | {} | {} | **{}** |".format(
                 item['slug'], item['target'], status_text, notification, action_summary
             )
              lines.append(row)
-    lines.append("---")
+    lines.append(u"---")
 
     # === BAGIAN KESIMPULAN UMUM (SAMA PERSIS DENGAN 03) ===
-    lines.append("\n## 🧠 Ringkasan Status Global & Aksi")
+    lines.append(u"\n## 🧠 Ringkasan Status Global & Aksi")
     
     if none_target_count > 0:
-         lines.append("\n* **❌ Target Belum Diset (Kritis):** Terdapat **{}** plugin yang memiliki **Target Engine: None**.".format(none_target_count))
-         lines.append("  * **Aksi Wajib:** Target harus ditetapkan saat menjalankan **`01.pull-directive.py`**.")
+         lines.append(u"\n* **❌ Target Belum Diset (Kritis):** Terdapat **{}** plugin yang memiliki **Target Engine: None**.".format(none_target_count))
+         lines.append(u"  * **Aksi Wajib:** Target harus ditetapkan saat menjalankan **`01.pull-directive.py`**.")
     
     if needs_pull_count > 0:
-        lines.append("\n* **⚠️ Status Pull/Deploy:** Terdapat **{}** plugin yang sudah memiliki target tetapi ditandai **⚠️ Local Only**.".format(needs_pull_count))
-        lines.append("  * **Aksi Wajib:** Jalankan **`01.pull-directive.py`** untuk mendorong perubahan ke pipeline.")
+        lines.append(u"\n* **⚠️ Status Pull/Deploy:** Terdapat **{}** plugin yang sudah memiliki target tetapi ditandai **⚠️ Local Only**.".format(needs_pull_count))
+        lines.append(u"  * **Aksi Wajib:** Jalankan **`01.pull-directive.py`** untuk mendorong perubahan ke pipeline.")
 
     if none_target_count == 0 and needs_pull_count == 0:
-         lines.append("\n* **Status Final:** Semua {} plugin berada dalam status **✅ Active**.".format(len(all_integrations)))
+         lines.append(u"\n* **Status Final:** Semua {} plugin berada dalam status **✅ Active**.".format(len(all_integrations)))
     
     active_notif_count = sum(1 for item in all_integrations if item['is_active'])
     if active_notif_count > 0:
-        lines.append("\n* **🔔 Notifikasi Email:** Sebanyak **{}** plugin memiliki notifikasi email yang **AKTIF**.".format(active_notif_count))
+        lines.append(u"\n* **🔔 Notifikasi Email:** Sebanyak **{}** plugin memiliki notifikasi email yang **AKTIF**.".format(active_notif_count))
     else:
-        lines.append("\n* **🔕 Notifikasi Email:** Semua plugin ditandai **PASIF**.")
+        lines.append(u"\n* **🔕 Notifikasi Email:** Semua plugin ditandai **PASIF**.")
     
-    return "\n".join(lines)
+    return u"\n".join(lines)
 
 
 def gh_api_put_file(file_path):
@@ -714,22 +752,38 @@ def distribute_vector(downloaded_files, parent):
     if "tsv" in downloaded_files and NFS_BASE_DIR:
         print("[DIST] Mencari direktori NFS 'dsiem-plugin-tsv' di {}...".format(NFS_BASE_DIR))
         nfs_target_dir = None
+        
+        # [FIX] LOGIC PINTAR NFS
         if not DRY_RUN:
-            try:
-                if os.path.isdir(NFS_BASE_DIR):
-                    for item in os.listdir(NFS_BASE_DIR):
-                        item_path = os.path.join(NFS_BASE_DIR, item)
-                        if os.path.isdir(item_path) and item.startswith("pvc-"):
-                            potential_target = os.path.join(item_path, "dsiem-plugin-tsv")
-                            if os.path.isdir(potential_target): nfs_target_dir = potential_target; break
-            except Exception as e: print("    -> [ERROR] Gagal mencari direktori NFS: {}".format(e))
+            # 1. Cek langsung: apakah NFS_BASE_DIR itu sendiri adalah targetnya? (e.g. /mnt/NAS/dsiem-plugin-tsv)
+            if os.path.basename(NFS_BASE_DIR.rstrip('/')) == 'dsiem-plugin-tsv':
+                 if os.path.isdir(NFS_BASE_DIR):
+                     nfs_target_dir = NFS_BASE_DIR
+            
+            # 2. Cek subfolder: apakah target ada DI DALAM path yg diinput? (e.g. input /mnt/NAS, target /mnt/NAS/dsiem-plugin-tsv)
+            if not nfs_target_dir:
+                 candidate = os.path.join(NFS_BASE_DIR, 'dsiem-plugin-tsv')
+                 if os.path.isdir(candidate):
+                     nfs_target_dir = candidate
+
+            # 3. Fallback: Logika lama (Cari di dalam folder PVC)
+            if not nfs_target_dir:
+                try:
+                    if os.path.isdir(NFS_BASE_DIR):
+                        for item in os.listdir(NFS_BASE_DIR):
+                            item_path = os.path.join(NFS_BASE_DIR, item)
+                            if os.path.isdir(item_path) and item.startswith("pvc-"):
+                                potential_target = os.path.join(item_path, "dsiem-plugin-tsv")
+                                if os.path.isdir(potential_target): nfs_target_dir = potential_target; break
+                except Exception as e: print("    -> [ERROR] Gagal listing direktori NFS: {}".format(e))
+            
             if nfs_target_dir: 
                 print("    -> Ditemukan: {}".format(nfs_target_dir))
                 success &= safe_copy(downloaded_files["tsv"], nfs_target_dir)
             else: 
                 print("    -> [ERROR] Direktori 'dsiem-plugin-tsv' tidak ditemukan di NFS path '{}'.".format(NFS_BASE_DIR)); 
                 success = False
-        else: info("    -> [DRY RUN] Pencarian dan penyalinan NFS dilewati."); success = True # Jika dry run, anggap sukses
+        else: print("    -> [DRY RUN] Pencarian dan penyalinan NFS dilewati."); success = True
     else: print("[WARN] File tsv atau NFS_BASE_DIR hilang."); success = False
     return success
 
@@ -765,7 +819,8 @@ def register_job(updater_path, is_focal_plugin, selected_action, distributed_phy
         print("  [FLAG] Menetapkan distribution_target = {}".format(distribution_target))
 
         json_string_mod = json.dumps(updater_data, indent=2, ensure_ascii=False)
-        try: unicode; json_string_mod = json_string_mod.decode('utf-8') if isinstance(json_string_mod, str) else json_string_mod
+        try: 
+            if isinstance(json_string_mod, str): json_string_mod = json_string_mod.decode('utf-8')
         except NameError: pass
         with io.open(updater_path, 'w', encoding='utf-8') as f_mod: f_mod.write(json_string_mod); f_mod.write(u'\n')
 
