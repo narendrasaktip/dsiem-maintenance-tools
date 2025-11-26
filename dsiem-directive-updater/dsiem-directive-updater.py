@@ -169,7 +169,7 @@ def show_help_panel():
             "• Batch Update: Support .txt/.csv (Name | Action).",
             "• Logging: Semua aksi (Manual/Batch) dicatat di CSV.",
             "• Timezone: Semua log menggunakan GMT+7 (WIB).",
-            "• File Log: batch_history_log.csv (di folder script)."
+            "• File Log: history_log.csv (di folder script)."
         ]),
         ("🔧 ACTIONS", [
             "• Edit Priority: Ubah prioritas rule.",
@@ -250,7 +250,7 @@ def append_to_csv_log(log_entries):
     Appends audit logs to a CSV file in the same directory as the script.
     """
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    log_file = os.path.join(script_dir, "batch_history_log.csv")
+    log_file = os.path.join(script_dir, "directive-changes_history-log.csv")
     
     file_exists = os.path.exists(log_file)
     
@@ -303,7 +303,7 @@ def get_action_status(action):
 def process_batch_pipe():
     print_header("BATCH UPDATE MODE", "📊")
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    files_found = [f for f in os.listdir(script_dir) if f.endswith('.csv') or f.endswith('.txt') if 'history_log' not in f]
+    files_found = [f for f in os.listdir(script_dir) if f.endswith('.csv') or f.endswith('.txt') if 'history-log' not in f]
     
     if not files_found:
         print_error("No input files (.csv/.txt) found")
