@@ -170,7 +170,7 @@ def show_help_panel():
         ]),
         ("📊 BATCH UPDATE", [
             "• Siapkan file .txt/.csv dengan format: Nama Event | Action",
-            "• Action support: Enabled, enable, Disabled, disable.",
+            "• Action support: enabled, enable, disabled, disable.",
             "• Script akan scan semua file JSON dan update statusnya otomatis."
         ]),
         ("🔧 NAVIGATION", [
@@ -262,8 +262,8 @@ def sync_all_files():
 
 def get_action_status(action):
     a = action.lower().strip()
-    if a in ['Enabled', 'enable', 'on', 'false', 'aktif']: return False
-    if a in ['Disabled', 'disable', 'off', 'true', 'pasif']: return True
+    if a in ['enabled', 'enable', 'on', 'false', 'active']: return False
+    if a in ['disabled', 'disable', 'off', 'true', 'deactive', 'passive']: return True
     return None
 
 def process_batch_pipe():
