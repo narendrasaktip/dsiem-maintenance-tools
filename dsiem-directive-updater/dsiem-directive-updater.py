@@ -9,6 +9,8 @@ import json
 import re
 import collections
 import time
+import datetime
+import csv
 
 try:
     import configparser
@@ -142,6 +144,7 @@ def print_loading(text):
     sys.stdout.flush()
 
 def print_progress_bar(current, total, prefix="Progress", bar_length=40):
+    if total == 0: total = 1
     percent = float(current) / total
     filled = int(bar_length * percent)
     bar = '█' * filled + '░' * (bar_length - filled)
@@ -154,7 +157,7 @@ def print_progress_bar(current, total, prefix="Progress", bar_length=40):
 
 # ======================= HELP SYSTEM =======================
 def show_help_panel():
-    print_header("QUICK HELP GUIDE", "❓", "Panduan Penggunaan DSIEM Manager")
+    print_header("QUICK HELP GUIDE", "❓", "Panduan Penggunaan")
     
     help_data = [
         ("📂 FILE SELECTION", [
@@ -162,24 +165,17 @@ def show_help_panel():
             "• Option 2: Search. Cari directive berdasarkan nama di semua file.",
             "• File akan otomatis di-download ke folder lokal saat dipilih."
         ]),
-        ("📋 EDITING DIRECTIVES", [
-            "• Enabled Directives: Ditampilkan dengan border HIJAU.",
-            "• Disabled Directives: Ditampilkan dengan border MERAH.",
-            "• Gunakan angka (mis: 1) atau range (mis: 1-5) untuk memilih.",
-            "• Menu Edit: Bisa ubah Priority, Toggle Status, atau Hapus."
+        ("📊 BATCH & LOGGING", [
+            "• Batch Update: Support .txt/.csv (Name | Action).",
+            "• Logging: Semua aksi (Manual/Batch) dicatat di CSV.",
+            "• Timezone: Semua log menggunakan GMT+7 (WIB).",
+            "• File Log: batch_history_log.csv (di folder script)."
         ]),
-        ("📊 BATCH UPDATE", [
-            "• Siapkan file .txt/.csv dengan format: Nama Event | Action",
-            "• Action support: enabled, enable, disabled, disable.",
-            "• Script akan scan semua file JSON dan update statusnya otomatis."
-        ]),
-        ("🔧 NAVIGATION", [
-            "• [N]ext / [P]rev : Pindah halaman list.",
-            "• [F]ilter : Filter list berdasarkan kata kunci nama.",
-            "• [S]tatus : Filter tampilan (ALL, Enabled Only, Disabled Only).",
-            "• [C]lear : Hapus filter kata kunci.",
-            "• [A]ll Enabled / [Z]Disabled : Opsi batch select untuk edit semua.",
-            "• [Q]uit : Keluar dari aplikasi."
+        ("🔧 ACTIONS", [
+            "• Edit Priority: Ubah prioritas rule.",
+            "• Toggle: Enable/Disable rule.",
+            "• Delete: Hapus rule dari file JSON.",
+            "• Semua perubahan akan dicatat di history log."
         ])
     ]
     
@@ -241,6 +237,44 @@ def restart_pods_logic(changed_filename=None):
     
     time.sleep(1)
 
+# ======================= LOGGING SYSTEM (GMT+7) =======================
+
+def get_wib_timestamp():
+    """Returns current time in GMT+7 (WIB)"""
+    utc_now = datetime.datetime.utcnow()
+    wib_time = utc_now + datetime.timedelta(hours=7)
+    return wib_time.strftime("%Y-%m-%d %H:%M:%S")
+
+def append_to_csv_log(log_entries):
+    """
+    Appends audit logs to a CSV file in the same directory as the script.
+    """
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    log_file = os.path.join(script_dir, "batch_history_log.csv")
+    
+    file_exists = os.path.exists(log_file)
+    
+    try:
+        with open(log_file, 'a') as f: # 'a' is for Append
+            writer = csv.writer(f)
+            # Write header if file is new
+            if not file_exists:
+                writer.writerow(["Timestamp (WIB)", "Filename", "Directive ID", "Directive Name", "Action", "Previous Status/Value"])
+            
+            for entry in log_entries:
+                writer.writerow([
+                    entry.get('timestamp', get_wib_timestamp()),
+                    entry['filename'],
+                    entry['id'],
+                    entry['name'],
+                    entry['action'],
+                    entry['prev_status']
+                ])
+        # Only show success message if called from batch, to avoid spamming in manual mode
+        # print_success("Log updated") 
+    except Exception as e:
+        print_error("Failed to write log file: {}".format(str(e)))
+
 # ======================= BATCH UPDATE =======================
 def sync_all_files():
     print_header("FILE SYNCHRONIZATION", "⬇️")
@@ -269,19 +303,21 @@ def get_action_status(action):
 def process_batch_pipe():
     print_header("BATCH UPDATE MODE", "📊")
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    files_found = [f for f in os.listdir(script_dir) if f.endswith('.csv') or f.endswith('.txt')]
+    files_found = [f for f in os.listdir(script_dir) if f.endswith('.csv') or f.endswith('.txt') if 'history_log' not in f]
     
     if not files_found:
-        print_error("No .csv/.txt files found")
+        print_error("No input files (.csv/.txt) found")
         input("Press Enter...")
         return
 
-    print("\nAvailable files:")
+    print("\nAvailable Input Files:")
     for i, f in enumerate(files_found, 1):
         print("[{}] {}".format(i, f))
     
     try:
-        sel = int(input("\nSelect File: ")) - 1
+        sel_input = input("\nSelect File: ")
+        if not sel_input: return
+        sel = int(sel_input) - 1
         file_path = os.path.join(script_dir, files_found[sel])
     except: return
 
@@ -295,36 +331,136 @@ def process_batch_pipe():
                 st = get_action_status(parts[-1])
                 if st is not None: target_updates[parts[0].strip().lower()] = st
 
-    print_success("Loaded {} rules".format(len(target_updates)))
+    print_success("Loaded {} update rules".format(len(target_updates)))
     
-    modified_files = set()
-    for jf in os.listdir(LOCAL_DIR):
-        if not jf.endswith('.json'): continue
+    print("\n{}Scanning files for matches...{}".format(TColors.CYAN, TColors.RESET))
+    
+    batch_report = collections.OrderedDict() 
+    files_to_scan = [f for f in os.listdir(LOCAL_DIR) if f.endswith('.json')]
+    total_files = len(files_to_scan)
+
+    for idx, jf in enumerate(files_to_scan, 1):
+        print_progress_bar(idx, total_files, "Scanning", 30)
         fpath = os.path.join(LOCAL_DIR, jf)
         try:
-            with open(fpath, 'r') as f: data = json.load(f, object_pairs_hook=collections.OrderedDict)
-            is_mod = False
+            with open(fpath, 'r') as f: 
+                data = json.load(f, object_pairs_hook=collections.OrderedDict)
+            
             dirs = data.get("directives", []) if "directives" in data else [data]
+            file_changes = []
+
             for d in dirs:
-                if d.get('name', '').lower() in target_updates:
-                    ns = target_updates[d.get('name', '').lower()]
-                    if d.get('disabled', False) != ns:
-                        d['disabled'] = ns
-                        is_mod = True
-            if is_mod:
-                with open(fpath, 'w') as f: json.dump(data, f, indent=4)
-                modified_files.add(jf)
-        except: pass
+                d_name = d.get('name', '').lower().strip()
+                if d_name in target_updates:
+                    new_state_disabled = target_updates[d_name]
+                    curr_state_disabled = d.get('disabled', False)
+                    
+                    if curr_state_disabled != new_state_disabled:
+                        action_label = "DISABLE" if new_state_disabled else "ENABLE"
+                        file_changes.append({
+                            'id': d.get('id'),
+                            'name': d.get('name'),
+                            'action': action_label,
+                            'new_val': new_state_disabled,
+                            'prev_status': "Disabled" if curr_state_disabled else "Enabled"
+                        })
+            
+            if file_changes:
+                batch_report[jf] = file_changes
+                
+        except Exception as e: pass
+    
+    print("") 
+
+    if not batch_report:
+        print_warning("No matching directives found to update.")
+        input("Press Enter...")
+        return
+
+    clear_screen()
+    print_header("BATCH PREVIEW", "📊", "Review changes before applying")
+    
+    total_changes = sum(len(v) for v in batch_report.values())
+    print("{}Found {} directives to update across {} files.{}".format(
+        TColors.CYAN, total_changes, len(batch_report), TColors.RESET))
+
+    for fname, changes in batch_report.items():
+        print("\n{}📄 File: {}{}".format(TColors.BOLD + TColors.WHITE, fname, TColors.RESET))
+        print_separator("─", 78, TColors.DIM)
+        
+        for item in changes:
+            if item['action'] == "ENABLE":
+                arrow = "{}➔ ENABLED{}".format(TColors.GREEN + TColors.BOLD, TColors.RESET)
+                old_st = "Disabled"
+            else:
+                arrow = "{}➔ DISABLED{}".format(TColors.RED + TColors.BOLD, TColors.RESET)
+                old_st = "Enabled "
+
+            print("  {}• ID: {:<8} {}| {}{:<45} {}| {} {}".format(
+                TColors.CYAN, item['id'], TColors.DIM, 
+                TColors.RESET + TColors.BOLD, item['name'][:45], 
+                TColors.DIM,
+                TColors.DIM + old_st + TColors.RESET, arrow
+            ))
+    
+    print_separator("═", 78, TColors.CYAN)
+    
+    confirm = input("\n{}Apply these {} changes? (y/n): {}".format(TColors.YELLOW, total_changes, TColors.RESET)).lower()
+    if confirm != 'y':
+        print_warning("Operation Cancelled.")
+        time.sleep(1.5)
+        return
+
+    print_loading("Applying changes and generating logs...")
+    
+    modified_files = set()
+    audit_logs = []
+    
+    for jf, changes in batch_report.items():
+        fpath = os.path.join(LOCAL_DIR, jf)
+        try:
+            with open(fpath, 'r') as f: 
+                data = json.load(f, object_pairs_hook=collections.OrderedDict)
+            
+            dirs = data.get("directives", []) if "directives" in data else [data]
+            change_map = {c['id']: c for c in changes}
+            
+            for d in dirs:
+                if d.get('id') in change_map:
+                    change_info = change_map[d.get('id')]
+                    d['disabled'] = change_info['new_val']
+                    
+                    audit_logs.append({
+                        'timestamp': get_wib_timestamp(),
+                        'filename': jf,
+                        'id': d.get('id'),
+                        'name': d.get('name'),
+                        'action': change_info['action'],
+                        'prev_status': change_info['prev_status']
+                    })
+            
+            with open(fpath, 'w') as f: 
+                json.dump(data, f, indent=4)
+            
+            modified_files.add(jf)
+            
+        except Exception as e:
+            print_error("Failed to write {}: {}".format(jf, e))
 
     if modified_files:
-        print_success("Updated {} files".format(len(modified_files)))
-        if input("Upload to pod? (y/n): ").lower() == 'y':
-            for mf in modified_files:
+        print_success("Successfully updated {} files".format(len(modified_files)))
+        append_to_csv_log(audit_logs)
+        
+        if input("\nUpload to pod? (y/n): ").lower() == 'y':
+            for i, mf in enumerate(modified_files, 1):
+                print_progress_bar(i, len(modified_files), "Uploading", 30)
                 run_command(["kubectl", "cp", os.path.join(LOCAL_DIR, mf), "{}:{}{}".format(POD_NAME, REMOTE_PATH, mf)])
+            
+            print_success("Upload complete")
             if input("Restart pods? (y/n): ").lower() == 'y':
                 restart_pods_logic(list(modified_files)[0])
     else:
-        print_warning("No changes needed")
+        print_warning("No files were modified.")
     input("Press Enter...")
 
 # ======================= EDITING LOGIC =======================
@@ -372,13 +508,11 @@ def select_directives_from_file(data, show_az_options=False, initial_filter=None
             TColors.MAGENTA + TColors.BOLD, status_text, TColors.RESET
         ))
 
-        # Filter Name
         if search_term:
             name_filtered = [d for d in all_directives if search_term.lower() in d.get('name', '').lower()]
         else:
             name_filtered = list(all_directives)
 
-        # Filter View Mode
         if view_mode == 0: filtered_directives = name_filtered
         elif view_mode == 1: filtered_directives = [d for d in name_filtered if not d.get('disabled')]
         elif view_mode == 2: filtered_directives = [d for d in name_filtered if d.get('disabled')]
@@ -404,17 +538,16 @@ def select_directives_from_file(data, show_az_options=False, initial_filter=None
             start = (current_page - 1) * ITEMS_PER_PAGE
             page_items = display_list[start:start + ITEMS_PER_PAGE]
 
-            # --- STATS CALCULATION FOR DISPLAY ---
             disp_Enabled = sum(1 for d in display_list if not d.get('disabled'))
             disp_Disabled = sum(1 for d in display_list if d.get('disabled'))
 
             print("\n{}Page {} of {} {} Total: {} {}│ {}Enabled: {} {}│ {}Disabled: {}{}".format(
                 TColors.BOLD + TColors.CYAN, current_page, total_pages,
                 TColors.RESET + TColors.DIM + "│", total_items,
-                TColors.RESET + TColors.DIM + "│", # Separator
-                TColors.GREEN, disp_Enabled,        # Enabled count with Green
-                TColors.RESET + TColors.DIM + "│", # Separator
-                TColors.RED, disp_Disabled,         # Disabled count with Red
+                TColors.RESET + TColors.DIM + "│", 
+                TColors.GREEN, disp_Enabled,
+                TColors.RESET + TColors.DIM + "│", 
+                TColors.RED, disp_Disabled, 
                 TColors.RESET
             ))
             
@@ -426,7 +559,6 @@ def select_directives_from_file(data, show_az_options=False, initial_filter=None
                 name = d.get('name', 'No Name')
                 name_style = TColors.DIM if is_dim else ""
                 
-                # --- UPDATE: Center Alignment for Index {:^3} and ID {:^8} ---
                 print("{}│{} {}[{:^3}]{} {}[ID:{:^8}]{} {}[P:{}]{} {}{}{}".format(
                     color_code, TColors.RESET,
                     TColors.BOLD + TColors.WHITE, idx, TColors.RESET,
@@ -550,42 +682,100 @@ def run_edit_session(filename, structure, initial_data):
             if not ids or ids[0] == 'back': 
                 break 
             
+            # --- HANDLE BATCH ENABLE/DISABLE ALL FROM MENU ---
             if ids[0] in ['set_all_Enabled', 'set_all_Disabled']:
                 val = (ids[0] == 'set_all_Disabled')
                 status_str = "Disabled" if val else "Enabled"
                 if input("\nSet ALL to {}? (y/n): ".format(status_str)).lower() == 'y':
-                    for d in current_data['directives']: d['disabled'] = val
-                    print_success("Updated all directives")
-                    time.sleep(0.5)
+                    manual_logs = []
+                    for d in current_data['directives']:
+                        old_val = d.get('disabled', False)
+                        if old_val != val:
+                            d['disabled'] = val
+                            manual_logs.append({
+                                'filename': base_filename,
+                                'id': d.get('id'),
+                                'name': d.get('name'),
+                                'action': "DISABLE" if val else "ENABLE",
+                                'prev_status': "Disabled" if old_val else "Enabled"
+                            })
+                    if manual_logs:
+                        append_to_csv_log(manual_logs)
+                        print_success("Updated and logged all directives")
+                    else:
+                        print_warning("No changes made (already in state)")
+                    time.sleep(1)
                 continue
             
             ids_set = set(int(x) for x in ids)
+            manual_logs = [] # Collector for logging
             
             if act == '2':  # Toggle
                 count = 0
                 for d in current_data['directives']:
                     if int(d.get('id')) in ids_set:
+                        old_status = "Disabled" if d.get('disabled', False) else "Enabled"
                         d['disabled'] = not d.get('disabled', False)
+                        new_action = "DISABLE" if d['disabled'] else "ENABLE"
+                        
+                        manual_logs.append({
+                            'filename': base_filename,
+                            'id': d.get('id'),
+                            'name': d.get('name'),
+                            'action': new_action,
+                            'prev_status': old_status
+                        })
                         count += 1
-                print_success("Toggled {} directive(s)".format(count))
+                
+                if manual_logs:
+                    append_to_csv_log(manual_logs)
+                    print_success("Toggled {} directive(s) & logged".format(count))
                 
             elif act == '3':  # Delete
                 print_warning("Deleting {} directive(s)".format(len(ids_set)))
                 if input("Type 'DELETE' to confirm: ").strip() == 'DELETE':
+                    # Log first before deleting
+                    to_delete = [d for d in current_data['directives'] if int(d.get('id')) in ids_set]
+                    for d in to_delete:
+                        manual_logs.append({
+                            'filename': base_filename,
+                            'id': d.get('id'),
+                            'name': d.get('name'),
+                            'action': "DELETE",
+                            'prev_status': "Exists"
+                        })
+                    
+                    # Actual deletion
                     current_data['directives'] = [d for d in current_data['directives'] if int(d.get('id')) not in ids_set]
-                    print_success("Deleted")
+                    
+                    if manual_logs:
+                        append_to_csv_log(manual_logs)
+                        print_success("Deleted and logged")
                 
             elif act == '1':  # Priority
                 try:
                     val = int(input("\nEnter new priority number: "))
                     for d in current_data['directives']:
-                        if int(d.get('id')) in ids_set: d['priority'] = val
-                    print_success("Priority updated")
-                except: 
+                        if int(d.get('id')) in ids_set:
+                            old_prio = d.get('priority', '-')
+                            if str(old_prio) != str(val):
+                                d['priority'] = val
+                                manual_logs.append({
+                                    'filename': base_filename,
+                                    'id': d.get('id'),
+                                    'name': d.get('name'),
+                                    'action': "PRIORITY_CHANGE",
+                                    'prev_status': "{} -> {}".format(old_prio, val)
+                                })
+                    
+                    if manual_logs:
+                        append_to_csv_log(manual_logs)
+                        print_success("Priority updated and logged")
+                except ValueError: 
                     print_error("Invalid number")
                     time.sleep(1)
             
-            time.sleep(0.3)
+            time.sleep(0.5)
 
 # ======================= MAIN WORKFLOW =======================
 
@@ -618,12 +808,10 @@ def select_file_workflow():
     return None
 
 def search_directive_workflow():
-    # 1. Hitung file lokal dulu untuk info statistik
     local_files_count = 0
     if os.path.exists(LOCAL_DIR):
         local_files_count = len([f for f in os.listdir(LOCAL_DIR) if f.endswith('.json')])
 
-    # 2. Tampilkan Header & Dashboard
     print_header("GLOBAL SEARCH", "🔍", "Search directives across all files")
     
     print("\n{}{}╭─ SEARCH CONTEXT ──────────────────────────────────────────╮{}".format(TColors.CYAN, TColors.BOLD, TColors.RESET))
@@ -634,22 +822,17 @@ def search_directive_workflow():
     print("{}│{} Match Type  : {}Case-insensitive, Partial match{}".format(
         TColors.CYAN, TColors.RESET, TColors.DIM, TColors.RESET))
     print("{}{}├─────────────────────────────────────────────────────────────┤{}".format(TColors.CYAN, TColors.BOLD, TColors.RESET))
-    
-    # --- BARIS YANG DIPERBAIKI ADA DI BAWAH INI (Ditambah TColors.RESET di akhir) ---
     print("{}│{} {}Tips:{}".format(TColors.CYAN, TColors.RESET, TColors.BOLD, TColors.RESET))
-    
     print("{}│{} • Type keywords like 'SQL', 'XSS', or specific ID.".format(TColors.CYAN, TColors.RESET))
     print("{}│{} • Leave empty and press Enter to Cancel/Back.".format(TColors.CYAN, TColors.RESET))
     print("{}{}╰─────────────────────────────────────────────────────────────╯{}".format(TColors.CYAN, TColors.BOLD, TColors.RESET))
     
-    # 3. Input Prompt
     print("\n{}Enter search keyword:{}".format(TColors.CYAN, TColors.RESET))
     term = input("{}▸{} ".format(TColors.BOLD + TColors.WHITE, TColors.RESET)).strip()
     
     if not term:
         return None
     
-    # 4. Proses Sync & Search
     print("") # Spacer
     if not sync_all_files(): return None
     
@@ -663,12 +846,11 @@ def search_directive_workflow():
                     data = json.load(jf)
                     dirs = data.get('directives', []) if 'directives' in data else [data]
                     for d in dirs:
-                        # Search by Name OR ID
                         d_name = d.get('name', '').lower()
                         d_id = str(d.get('id', ''))
                         if term.lower() in d_name or term in d_id:
                             matches.append(f)
-                            break # Found match in this file, move to next file
+                            break 
             except: pass
     
     if not matches:
@@ -678,7 +860,6 @@ def search_directive_workflow():
         
     print_success("Found matches in {} file(s)".format(len(matches)))
     
-    # Tampilkan hasil
     print("\n{}📄 MATCHING FILES:{}".format(TColors.BOLD + TColors.CYAN, TColors.RESET))
     print_separator("─", 78, TColors.DIM)
     for i, f in enumerate(matches, 1):
