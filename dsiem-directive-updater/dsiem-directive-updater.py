@@ -87,23 +87,7 @@ class TColors:
 
 def clear_screen():
     os.system('clear' if os.name != 'nt' else 'cls')
-
-def print_banner():
-    banner = """
-    ╔═══════════════════════════════════════════════════════════════════════════╗
-    ║                                                                           ║
-    ║   ██████╗ ███████╗██╗███████╗███╗   ███╗    ███╗   ███╗ ██████╗ ██████╗   ║
-    ║   ██╔══██╗██╔════╝██║██╔════╝████╗ ████║    ████╗ ████║██╔════╝ ██╔══██╗  ║
-    ║   ██║  ██║███████╗██║█████╗  ██╔████╔██║    ██╔████╔██║██║  ███╗██████╔╝  ║
-    ║   ██║  ██║╚════██║██║██╔══╝  ██║╚██╔╝██║    ██║╚██╔╝██║██║   ██║██╔══██╗  ║
-    ║   ██████╔╝███████║██║███████╗██║ ╚═╝ ██║    ██║ ╚═╝ ██║╚██████╔╝██║  ██║  ║
-    ║   ╚═════╝ ╚══════╝╚═╝╚══════╝╚═╝     ╚═╝    ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝  ║
-    ║                                                                           ║
-    ║                       Directive Configuration Manager                     ║
-    ╚═══════════════════════════════════════════════════════════════════════════╝
-    """
-    print("{}{}{}".format(TColors.BOLD + TColors.CYAN, banner, TColors.RESET))
-
+    
 def print_separator(char="═", width=80, color=TColors.CYAN):
     print("{}{}{}".format(color, char * width, TColors.RESET))
 
@@ -715,7 +699,6 @@ def main():
         
         while True:
             clear_screen()
-            print_banner()
             print_info_box("SYSTEM CONFIGURATION", [
                 ("Pod", POD_NAME), ("Local Dir", LOCAL_DIR), ("Pattern", FILE_PATTERN)
             ])
