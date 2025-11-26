@@ -163,22 +163,22 @@ def show_help_panel():
             "• File akan otomatis di-download ke folder lokal saat dipilih."
         ]),
         ("📋 EDITING DIRECTIVES", [
-            "• Active Directives: Ditampilkan dengan border HIJAU.",
-            "• Inactive Directives: Ditampilkan dengan border MERAH.",
+            "• Enabled Directives: Ditampilkan dengan border HIJAU.",
+            "• Disabled Directives: Ditampilkan dengan border MERAH.",
             "• Gunakan angka (mis: 1) atau range (mis: 1-5) untuk memilih.",
             "• Menu Edit: Bisa ubah Priority, Toggle Status, atau Hapus."
         ]),
         ("📊 BATCH UPDATE", [
             "• Siapkan file .txt/.csv dengan format: Nama Event | Action",
-            "• Action support: active, enable, passive, disable.",
+            "• Action support: Enabled, enable, Disabled, disable.",
             "• Script akan scan semua file JSON dan update statusnya otomatis."
         ]),
         ("🔧 NAVIGATION", [
             "• [N]ext / [P]rev : Pindah halaman list.",
             "• [F]ilter : Filter list berdasarkan kata kunci nama.",
-            "• [S]tatus : Filter tampilan (ALL, ACTIVE Only, PASSIVE Only).",
+            "• [S]tatus : Filter tampilan (ALL, Enabled Only, Disabled Only).",
             "• [C]lear : Hapus filter kata kunci.",
-            "• [A]ll Active / [Z]Passive : Opsi batch select untuk edit semua.",
+            "• [A]ll Enabled / [Z]Disabled : Opsi batch select untuk edit semua.",
             "• [Q]uit : Keluar dari aplikasi."
         ])
     ]
@@ -262,8 +262,8 @@ def sync_all_files():
 
 def get_action_status(action):
     a = action.lower().strip()
-    if a in ['active', 'enable', 'on', 'false', 'aktif']: return False
-    if a in ['passive', 'disable', 'off', 'true', 'pasif']: return True
+    if a in ['Enabled', 'enable', 'on', 'false', 'aktif']: return False
+    if a in ['Disabled', 'disable', 'off', 'true', 'pasif']: return True
     return None
 
 def process_batch_pipe():
@@ -350,7 +350,7 @@ def parse_selection(input_str, max_total_items):
 def select_directives_from_file(data, show_az_options=False, initial_filter=None):
     current_page = 1
     search_term = initial_filter if initial_filter else ""
-    view_mode = 0 # 0=All, 1=Active, 2=Passive
+    view_mode = 0 # 0=All, 1=Enabled, 2=Disabled
     
     while True:
         print_header("SELECT DIRECTIVES", "📋")
@@ -362,8 +362,8 @@ def select_directives_from_file(data, show_az_options=False, initial_filter=None
             return ['back']
 
         status_text = "ALL"
-        if view_mode == 1: status_text = "ACTIVE ONLY"
-        elif view_mode == 2: status_text = "PASSIVE ONLY"
+        if view_mode == 1: status_text = "Enabled ONLY"
+        elif view_mode == 2: status_text = "Disabled ONLY"
         
         filter_text = search_term if search_term else "None"
         print("{}🔍 Filter: {}{} {}│{} {}👁️  View: {}{}".format(
@@ -390,9 +390,9 @@ def select_directives_from_file(data, show_az_options=False, initial_filter=None
         else:
             sorted_directives = sorted(filtered_directives, key=lambda d: d.get('name', '').lower())
             if view_mode == 0:
-                active_dirs = [d for d in sorted_directives if not d.get('disabled')]
-                passive_dirs = [d for d in sorted_directives if d.get('disabled')]
-                display_list = active_dirs + passive_dirs
+                Enabled_dirs = [d for d in sorted_directives if not d.get('disabled')]
+                Disabled_dirs = [d for d in sorted_directives if d.get('disabled')]
+                display_list = Enabled_dirs + Disabled_dirs
             else:
                 display_list = sorted_directives
             
@@ -405,16 +405,16 @@ def select_directives_from_file(data, show_az_options=False, initial_filter=None
             page_items = display_list[start:start + ITEMS_PER_PAGE]
 
             # --- STATS CALCULATION FOR DISPLAY ---
-            disp_active = sum(1 for d in display_list if not d.get('disabled'))
-            disp_passive = sum(1 for d in display_list if d.get('disabled'))
+            disp_Enabled = sum(1 for d in display_list if not d.get('disabled'))
+            disp_Disabled = sum(1 for d in display_list if d.get('disabled'))
 
-            print("\n{}Page {} of {} {} Total: {} {}│ {}Active: {} {}│ {}Passive: {}{}".format(
+            print("\n{}Page {} of {} {} Total: {} {}│ {}Enabled: {} {}│ {}Disabled: {}{}".format(
                 TColors.BOLD + TColors.CYAN, current_page, total_pages,
                 TColors.RESET + TColors.DIM + "│", total_items,
                 TColors.RESET + TColors.DIM + "│", # Separator
-                TColors.GREEN, disp_active,        # Active count with Green
+                TColors.GREEN, disp_Enabled,        # Enabled count with Green
                 TColors.RESET + TColors.DIM + "│", # Separator
-                TColors.RED, disp_passive,         # Passive count with Red
+                TColors.RED, disp_Disabled,         # Disabled count with Red
                 TColors.RESET
             ))
             
@@ -435,22 +435,22 @@ def select_directives_from_file(data, show_az_options=False, initial_filter=None
                     name_style, name, TColors.RESET
                 ))
 
-            page_active = [d for d in page_items if not d.get('disabled')]
-            page_passive = [d for d in page_items if d.get('disabled')]
+            page_Enabled = [d for d in page_items if not d.get('disabled')]
+            page_Disabled = [d for d in page_items if d.get('disabled')]
 
-            if page_active:
-                print("\n{}╭─ ACTIVE DIRECTIVES (Disabled: False) {}".format(
+            if page_Enabled:
+                print("\n{}╭─ ENABLED DIRECTIVES (Disabled: False) {}".format(
                     TColors.GREEN + TColors.BOLD, "─" * 42 + "╮" + TColors.RESET
                 ))
-                for d in page_active: print_item(d, TColors.GREEN)
+                for d in page_Enabled: print_item(d, TColors.GREEN)
                 print("{}╰{}╯{}".format(TColors.GREEN, "─" * 76, TColors.RESET))
 
-            if page_passive:
-                if page_active: print("") 
-                print("{}╭─ INACTIVE DIRECTIVES (Disabled: True) {}".format(
+            if page_Disabled:
+                if page_Enabled: print("") 
+                print("{}╭─ DISABLED DIRECTIVES (Disabled: True) {}".format(
                     TColors.RED + TColors.BOLD, "─" * 41 + "╮" + TColors.RESET
                 ))
-                for d in page_passive: print_item(d, TColors.RED, is_dim=True)
+                for d in page_Disabled: print_item(d, TColors.RED, is_dim=True)
                 print("{}╰{}╯{}".format(TColors.RED, "─" * 76, TColors.RESET))
 
         print("\n{}{}{}".format(TColors.CYAN, "═" * 78, TColors.RESET))
@@ -464,8 +464,8 @@ def select_directives_from_file(data, show_az_options=False, initial_filter=None
         opts.append("{}S{}=Status".format(TColors.MAGENTA, TColors.RESET))
         
         if show_az_options:
-            opts.append("{}A{}=All Active".format(TColors.GREEN, TColors.RESET))
-            opts.append("{}Z{}=All Passive".format(TColors.RED, TColors.RESET))
+            opts.append("{}A{}=All Enabled".format(TColors.GREEN, TColors.RESET))
+            opts.append("{}Z{}=All Disabled".format(TColors.RED, TColors.RESET))
         opts.append("{}B{}=Back".format(TColors.RED, TColors.RESET))
         
         print("{}Options: {}{}".format(TColors.DIM, " │ ".join(opts), TColors.RESET))
@@ -485,8 +485,8 @@ def select_directives_from_file(data, show_az_options=False, initial_filter=None
         elif sel == 's':
             view_mode = (view_mode + 1) % 3
             current_page = 1
-        elif show_az_options and sel == 'a': return ['set_all_active']
-        elif show_az_options and sel == 'z': return ['set_all_passive']
+        elif show_az_options and sel == 'a': return ['set_all_Enabled']
+        elif show_az_options and sel == 'z': return ['set_all_Disabled']
         elif not sel: continue
         else:
             parsed = parse_selection(sel, len(display_list))
@@ -509,18 +509,18 @@ def run_edit_session(filename, structure, initial_data):
         print_header("EDIT MENU", "✏️", base_filename)
         
         all_dirs = current_data.get('directives', [])
-        active_cnt = sum(1 for d in all_dirs if not d.get('disabled', False))
-        passive_cnt = sum(1 for d in all_dirs if d.get('disabled', False))
+        Enabled_cnt = sum(1 for d in all_dirs if not d.get('disabled', False))
+        Disabled_cnt = sum(1 for d in all_dirs if d.get('disabled', False))
         
         print_info_box("STATISTICS", [
             ("Total Directives", len(all_dirs)),
-            ("Active", "{}{}{}".format(TColors.GREEN, active_cnt, TColors.RESET)),
-            ("Inactive", "{}{}{}".format(TColors.RED, passive_cnt, TColors.RESET))
+            ("Enabled", "{}{}{}".format(TColors.GREEN, Enabled_cnt, TColors.RESET)),
+            ("Disabled", "{}{}{}".format(TColors.RED, Disabled_cnt, TColors.RESET))
         ])
 
         print_menu_card([
             ("1", "Change Priority Level", TColors.CYAN, ""),
-            ("2", "Toggle Active/Passive Status", TColors.YELLOW, ""),
+            ("2", "Toggle Enabled/Disabled Status", TColors.YELLOW, ""),
             ("3", "Delete Directive(s)", TColors.RED, ""),
             ("4", "Save & Upload to Pod", TColors.GREEN, ""),
             ("5", "Return to Main Menu", TColors.WHITE, "")
@@ -550,9 +550,9 @@ def run_edit_session(filename, structure, initial_data):
             if not ids or ids[0] == 'back': 
                 break 
             
-            if ids[0] in ['set_all_active', 'set_all_passive']:
-                val = (ids[0] == 'set_all_passive')
-                status_str = "PASSIVE" if val else "ACTIVE"
+            if ids[0] in ['set_all_Enabled', 'set_all_Disabled']:
+                val = (ids[0] == 'set_all_Disabled')
+                status_str = "Disabled" if val else "Enabled"
                 if input("\nSet ALL to {}? (y/n): ".format(status_str)).lower() == 'y':
                     for d in current_data['directives']: d['disabled'] = val
                     print_success("Updated all directives")
