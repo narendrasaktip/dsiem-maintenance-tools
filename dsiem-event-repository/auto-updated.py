@@ -36,6 +36,8 @@ try: JSONDecodeError = json.JSONDecodeError
 except AttributeError: JSONDecodeError = ValueError
 try: FileNotFoundError
 except NameError: FileNotFoundError = IOError
+try: unicode
+except NameError: unicode = str
 # =========================================================
 
 # =========================================================
@@ -363,9 +365,35 @@ def load_cred(path, user):
                      else: die("[CRED] Empty password for user {} in {}".format(user, path))
     except IOError as e: die("[CRED] Cannot read credentials file {}: {}".format(path, e))
     die("[CRED] User '{}' not found in {}".format(user, path))
+
 def fetch_titles(es_cfg, q_cfg, debug=False):
-    host, verify, timeout = es_cfg.get("host"), es_cfg.get("verify_tls", False), es_cfg.get("timeout", 3000)
-    if not host: die("Elasticsearch host not configured.")
+    # [PATCHED] Prioritize Environment Variable (ES_HOST) over JSON config
+    # and perform aggressive sanitization to remove quotes/backslashes.
+    env_host = os.getenv("ES_HOST")
+    json_host = es_cfg.get("host")
+    
+    # Gunakan ENV var jika ada isinya, jika tidak baru fallback ke JSON
+    raw_host = env_host if (env_host and env_host.strip()) else json_host
+    
+    if not raw_host: 
+        die("Elasticsearch host not configured (checked ES_HOST env var & JSON config).")
+
+    # Sanitasi: Hapus spasi, quote, dan backslash (\) yang menyebabkan error %5c
+    # Gunakan replace agar backslash di tengah/awal string (setelah http://) juga hilang
+    host = raw_host.strip().replace("'", "").replace('"', "").replace('\\', "")
+    
+    # Pastikan scheme ada (default http jika tidak ada)
+    if not host.startswith("http"):
+        # Jika port 443, asumsikan https, selain itu http
+        if ":443" in host: host = "https://" + host
+        else: host = "http://" + host
+
+    if debug or True: # Force print debug host untuk verifikasi
+        print("[DEBUG] Raw ES_HOST: '{}' -> Cleaned: '{}'".format(raw_host, host))
+    
+    verify = es_cfg.get("verify_tls", False)
+    timeout = es_cfg.get("timeout", 3000)
+    
     u,p = load_cred(ES_PASSWD_FILE, ES_USER_LOOKUP)
     auth = HTTPBasicAuth(u,p)
     index, field, size = q_cfg.get("index"), q_cfg.get("field"), int(q_cfg.get("size", 2000))
