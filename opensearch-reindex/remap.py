@@ -25,9 +25,9 @@ import json
 import requests
 
 # ===================== KONFIGURASI =====================
-OS_HOST    = "http://opensearch:9200"         # <-- ganti
-OS_USER    = "systemadm"                       # <-- ganti
-OS_PASS    = "gungiov5ue9iez8Shi4O"            # <-- ganti
+OS_HOST    = "#HOST#"  
+OS_USER    = "#USER#"                
+OS_PASS    = "#PASS#"       
 VERIFY_TLS = False
 
 SUFFIX     = "-reindex"
