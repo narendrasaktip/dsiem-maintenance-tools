@@ -802,9 +802,9 @@ def register_job(updater_path, is_focal_plugin, selected_action, distributed_phy
         distribution_flag = selected_action.startswith("Distribusi")
         
         # LOGIKA PENTING: needs_distribution
-        # Diset ke False hanya jika aksi adalah distribusi DAN distribusi fisik SUKSES.
-        if distribution_flag and distributed_physically: needs_dist_flag = False
-        else: needs_dist_flag = True 
+        # REVISI: Flag ini adalah KONFIGURASI ("Apakah plugin ini harus didistribusikan otomatis?"),
+        # bukan STATE ("Apakah plugin ini butuh distribusi sekarang?").
+        needs_dist_flag = distribution_flag
 
         distribution_target = "None"
         if distribution_flag:

@@ -45,7 +45,7 @@ REPORT_DATA_FILE = "integrations.json"
 REPORT_DIR = "monitoring-integration"
 REPORT_FILENAME_SUFFIX = "_integration-status.md"
 
-# ====== FUNGSI I/O & HELPERS (Disederhanakan, diasumsikan lengkap di file Anda) ======
+# ====== FUNGSI I/O & HELPERS ======
 
 def py_input(prompt):
     try: return raw_input(prompt)
@@ -137,13 +137,17 @@ def scan_integrations_from_jobs():
     return sorted(integrations, key=lambda x: x['slug'])
 
 def get_status_display(item):
-    """Menentukan status display berdasarkan terminologi baru."""
+    """
+    Menentukan status display (REVISI LOGIKA).
+    - needs_dist = True  -> Active (Script auto-updated akan mendistribusikan)
+    - needs_dist = False -> Update Only (Script auto-updated hanya update repo)
+    """
     if item['target'] == 'None':
         return "❌ Target Not Found"
     elif item['needs_dist']:
-        return "⚠️ Local Only"
+        return "✅ Active (Auto-Distribute)"
     else:
-        return "✅ Active"
+        return "⏸️ Update Only"
 
 
 def update_integration_report(customer_name, new_integrations):
@@ -170,7 +174,6 @@ def update_integration_report(customer_name, new_integrations):
     
     markdown_filename = "{}{}".format(customer_slug, REPORT_FILENAME_SUFFIX)
     
-    # PERBAIKAN: Membuat direktori dengan penanganan error yang baik
     try: 
          import os
          if not os.path.exists(REPORT_DIR): 
@@ -203,7 +206,7 @@ def generate_single_markdown_report(cust_data, all_integrations):
     lines.append(header); lines.append(separator)
 
     # Variabel untuk Kesimpulan Umum
-    needs_pull_count = sum(1 for item in all_integrations if item['needs_dist'] and item['target'] != 'None')
+    update_only_count = sum(1 for item in all_integrations if not item['needs_dist'] and item['target'] != 'None')
     none_target_count = sum(1 for item in all_integrations if item['target'] == 'None')
 
     if not integrations_map:
@@ -215,13 +218,13 @@ def generate_single_markdown_report(cust_data, all_integrations):
              status_text = get_status_display(item)
              notification = item['is_active'] and "🔔 AKTIF" or "🔕 PASIF"
              
-             # Menentukan Kesimpulan Aksi Wajib Inline
+             # Menentukan Kesimpulan Aksi Wajib Inline (Revisi Logika)
              if item['target'] == 'None':
                  action_summary = "SET TARGET (RUN 01)"
              elif item['needs_dist']:
-                 action_summary = "RUN 01.PULL-DIRECTIVE.PY"
+                 action_summary = "OK (AUTO-SYNC)"
              else:
-                 action_summary = "N/A"
+                 action_summary = "ENABLE DIST IF NEEDED"
              
              row = "| **{}** | {} | {} | {} | **{}** |".format(
                 item['slug'], item['target'], status_text, notification, action_summary
@@ -238,14 +241,14 @@ def generate_single_markdown_report(cust_data, all_integrations):
          lines.append("\n* **❌ Target Belum Diset (Kritis):** Terdapat **{}** plugin yang memiliki **Target Engine: None**.".format(none_target_count))
          lines.append("  * **Aksi Wajib:** Target harus ditetapkan saat menjalankan **`01.pull-directive.py`**.")
     
-    # Aturan 2: Status Need Pull
-    if needs_pull_count > 0:
-        lines.append("\n* **⚠️ Status Pull/Deploy:** Terdapat **{}** plugin yang sudah memiliki target tetapi ditandai **⚠️ Local Only**.".format(needs_pull_count))
-        lines.append("  * **Aksi Wajib:** Jalankan **`01.pull-directive.py`** untuk mendorong perubahan ke pipeline.")
+    # Aturan 2: Status Update Only (Revisi Logika)
+    if update_only_count > 0:
+        lines.append("\n* **⏸️ Mode Update Only:** Terdapat **{}** plugin yang hanya akan diupdate di repo (GitHub) tapi **TIDAK** didistribusikan ke Engine.".format(update_only_count))
+        lines.append("  * **Info:** Jika ingin mengaktifkan distribusi, gunakan script `02.manage_plugins.py` opsi 2.")
 
     # Status Final
-    if none_target_count == 0 and needs_pull_count == 0:
-         lines.append("\n* **Status Final:** Semua {} plugin berada dalam status **✅ Active**.".format(len(all_integrations)))
+    if none_target_count == 0 and update_only_count == 0:
+         lines.append("\n* **Status Final:** Semua {} plugin berada dalam status **✅ Active (Auto-Distribute)**.".format(len(all_integrations)))
     
     # Aturan 3: Notifikasi
     active_notif_count = sum(1 for item in all_integrations if item['is_active'])
@@ -257,7 +260,6 @@ def generate_single_markdown_report(cust_data, all_integrations):
     return "\n".join(lines)
 
 def gh_api_put_file(file_path):
-    # Implementasi disalin dari konteks sebelumnya
     import requests, base64
     
     print("[GH UPLOAD] Menyiapkan upload otomatis...")
@@ -307,15 +309,13 @@ def update_job_distribution_status(job_path, needs_distribution):
     target = updater_data.get("layout", {}).get("distribution_target", "None")
     
     if needs_distribution and target == "None":
-         print("[ERROR] Plugin wajib memiliki Target Engine (Logstash/Vector) sebelum ditandai 'Need Pull/Deploy'.")
+         print("[ERROR] Plugin wajib memiliki Target Engine (Logstash/Vector) sebelum ditandai 'Active'.")
          return False
         
     if 'layout' not in updater_data: updater_data['layout'] = OrderedDict()
     
-    if not needs_distribution and 'needs_distribution' in updater_data['layout']:
-        del updater_data['layout']['needs_distribution']
-    elif needs_distribution:
-        updater_data['layout']['needs_distribution'] = True
+    # Update logic: Simpan True/False sesuai request
+    updater_data['layout']['needs_distribution'] = needs_distribution
         
     return safe_save_json(job_path, updater_data)
 
@@ -338,17 +338,20 @@ def toggle_plugin_status(integrations_list, item_indices_to_toggle, active_plugi
         
         elif field == 'needs_dist':
             job_path = item['job_path']
-            is_currently_needed = item['needs_dist']
+            is_currently_active = item['needs_dist'] # True means Active (Distributing)
             
-            if not is_currently_needed and item['target'] == "None":
-                toggled_summary.append("[ERROR] Gagal mengubah: '{}' wajib memiliki Target Engine sebelum ditandai 'Local Only'.".format(slug))
+            # Kita ingin toggle: Jika Active -> Pasif (Update Only), Jika Pasif -> Active
+            new_state = not is_currently_active
+            
+            if new_state and item['target'] == "None":
+                toggled_summary.append("[ERROR] Gagal mengubah: '{}' wajib memiliki Target Engine sebelum diaktifkan.".format(slug))
                 continue 
             
-            if update_job_distribution_status(job_path, not is_currently_needed):
-                if is_currently_needed:
-                    toggled_summary.append("-> Status '{}' diubah menjadi ✅ Active.".format(slug))
-                else:
-                    toggled_summary.append("-> Status '{}' diubah menjadi ⚠️ Local Only.".format(slug))
+            if update_job_distribution_status(job_path, new_state):
+                if new_state: # Menjadi True
+                    toggled_summary.append("-> Status '{}' diubah menjadi ✅ Active (Auto-Distribute).".format(slug))
+                else: # Menjadi False
+                    toggled_summary.append("-> Status '{}' diubah menjadi ⏸️ Update Only.".format(slug))
             else:
                  toggled_summary.append("-> [ERROR] Gagal mengubah status distribusi untuk '{}'.".format(slug))
     
@@ -386,7 +389,7 @@ def manage_distribution_flow(integrations_list, active_plugins):
     """Mengelola Target Engine dan Needs Distribution flag (Opsi 2)."""
     
     while True:
-        print_header("2. KELOLA STATUS DISTRIBUSI (PULL FLAG)")
+        print_header("2. KELOLA STATUS DISTRIBUSI (AUTO-SYNC FLAG)")
         
         for i, item in enumerate(integrations_list, 1):
             status_display = get_status_display({'target': item['target'], 'needs_dist': item['needs_dist']})
@@ -394,12 +397,12 @@ def manage_distribution_flow(integrations_list, active_plugins):
             # Format output baris
             output = "{:3d}. {:<25} [Target: {:<8}] Status: {}".format(i, item['slug'], item['target'], status_display)
             if item['needs_dist'] and item['target'] == 'None':
-                 output += " (KRITIS: SET TARGET DENGAN 01!)" 
+                 output += " (INVALID: ACTIVE BUT NO TARGET)" 
             print(output)
         
         print("-" * 70)
         print("Aksi Tersedia:")
-        print("  - Masukkan nomor/range (cth: 1, 3-5) untuk **MENGUBAH STATUS PULL/DEPLOY** (Active <-> Local Only).")
+        print("  - Masukkan nomor/range (cth: 1, 3-5) untuk **MENGUBAH STATUS** (Active <-> Update Only).")
         print("  - 'S' untuk **SIMPAN PERUBAHAN**")
         print("  - 'b' untuk Kembali ke menu utama.")
 
@@ -446,7 +449,7 @@ def main_loop():
         # MENU UTAMA YANG DISEDERHANAKAN
         print("Pilih opsi manajemen:")
         print("1. Kelola **Notifikasi Email** (Aktif/Pasif)")
-        print("2. Kelola **Status Distribusi** (Target Engine & Pull Flag)")
+        print("2. Kelola **Status Distribusi** (Active/Update Only)")
         print("3. Sinkronisasi & **Upload Laporan Status (.md)** ke GitHub")
         print("q. Keluar")
         
