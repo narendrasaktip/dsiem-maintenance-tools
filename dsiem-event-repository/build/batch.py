@@ -393,7 +393,7 @@ def generate_updater_config(output_path, context):
     
     updater_config = OrderedDict([
         ("es", OrderedDict([
-            ("host", context.get("es_host")),
+            ("host", None),
             ("verify_tls", context.get("verify_tls")),
             ("timeout", context.get("timeout")),
         ])),
@@ -413,7 +413,7 @@ def generate_updater_config(output_path, context):
             ("module", context.get("module_slug")),
             ("submodule", context.get("submodule_slug")),
             ("filter_key", context.get("filter1_slug")),
-            ("needs_distribution", False)
+            ("needs_distribution", True)
         ])),
         ("file70", OrderedDict([
             ("plugin_id", context.get("plugin_id_final"))
