@@ -23,9 +23,9 @@ import os, sys, time, json, re, requests
 from datetime import datetime, timedelta
 
 # ===================== KONFIGURASI =====================
-OS_HOST = os.environ.get("OS_HOST", "http://opensearch:9200")
-OS_USER = os.environ.get("OS_USER", "systemadm")
-OS_PASS = os.environ.get("OS_PASS", "gungiov5ue9iez8Shi4O")
+OS_HOST = os.environ.get("OS_HOST", "#HOST#")
+OS_USER = os.environ.get("OS_USER", "#USER#")
+OS_PASS = os.environ.get("OS_PASS", "#PASS#")
 VERIFY_TLS = False
 
 # --- PILIH MODE SUMBER INDEX ---
