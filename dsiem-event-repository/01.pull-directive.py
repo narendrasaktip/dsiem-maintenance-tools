@@ -185,7 +185,6 @@ def update_config_sh(paths_to_update):
                 key = match.group(2)
                 if key in paths_to_update:
                     new_value = paths_to_update[key]
-                    # [FIX] Tambahkan 'u' di depan string agar menjadi Unicode
                     try:
                         if isinstance(new_value, str): new_value = new_value.decode('utf-8')
                     except: pass
@@ -201,7 +200,6 @@ def update_config_sh(paths_to_update):
         for key, value in paths_to_update.items():
             if key not in updated_keys:
                 print("    -> Menambahkan variabel baru: {}".format(key))
-                # [FIX] Decode value jika masih bytes, dan gunakan format string Unicode
                 try:
                     if isinstance(value, str): value = value.decode('utf-8')
                 except: pass
@@ -225,7 +223,6 @@ def reload_global_paths():
     
     print("[INFO] Memuat ulang variabel path dari environment...")
     
-    # Reload file config.sh agar env vars masuk ke os.environ
     if os.path.exists("./config.sh"):
         command = ['bash', '-c', 'source ./config.sh && env']
         proc = subprocess.Popen(command, stdout=subprocess.PIPE)
@@ -252,7 +249,6 @@ def get_active_plugins():
     if isinstance(data, list): return set(data)
     return set()
 
-# FUNGSI PENTING: Mendapatkan status display (Harus sinkron dengan 03.manage_distributed.py)
 def get_status_display_sync(item_needs_dist, item_target):
     if item_target == 'None':
         return u"❌ Target Not Found"
@@ -281,7 +277,6 @@ def scan_integrations_for_current_customer():
         needs_dist = layout.get("needs_distribution", False)
         is_active = slug in active_slugs
         
-        # MENGGUNAKAN STATUS SINKRON DENGAN 03.MANAGE_DISTRIBUTED.PY
         status_text = get_status_display_sync(needs_dist, target)
         notif_str = u"AKTIF (Email)" if is_active else u"Pasif"
 
@@ -332,7 +327,6 @@ def update_integration_report(customer_name, new_integrations):
     return local_markdown_path
 
 def generate_single_markdown_report_sync(cust_data, all_integrations):
-    """Fungsi generasi laporan Markdown yang sinkron (menggunakan logika 03)."""
     lines = []; timestamp = cust_data['last_updated']
     customer_name = cust_data['customer_name']; integrations_map = cust_data['integrations']
     
@@ -340,15 +334,12 @@ def generate_single_markdown_report_sync(cust_data, all_integrations):
     lines.append(u"\n**Waktu Pemrosesan Terakhir:** {}\n".format(timestamp))
     lines.append(u"---")
     
-    # === TABEL DETAIL ===
     lines.append(u"\n## ⚙️ Detail Integrasi Terdaftar")
 
-    # Kolom baru: Aksi/Status (Menggabungkan kebutuhan pull dan target)
     header = u"| Plugin / Device (Slug) | Target Engine | Status Distribusi | Notifikasi Email | Kesimpulan Aksi Wajib |"
     separator = u"| :--- | :---: | :---: | :---: | :--- |"
     lines.append(header); lines.append(separator)
 
-    # Variabel untuk Kesimpulan Umum
     needs_pull_count = sum(1 for item in all_integrations if item['needs_dist'] and item['target'] != 'None')
     none_target_count = sum(1 for item in all_integrations if item['target'] == 'None')
 
@@ -357,11 +348,9 @@ def generate_single_markdown_report_sync(cust_data, all_integrations):
     else:
         sorted_integrations = sorted(all_integrations, key=lambda x: x['slug'])
         for item in sorted_integrations:
-             # MENGGUNAKAN LOGIKA STATUS DISPLAY SINKRON DENGAN 03
              status_text = get_status_display_sync(item['needs_dist'], item['target'])
              notification = item['is_active'] and u"🔔 AKTIF" or u"🔕 PASIF"
              
-             # Menentukan Kesimpulan Aksi Wajib Inline
              if item['target'] == 'None':
                  action_summary = "SET TARGET (RUN 01)"
              elif item['needs_dist']:
@@ -375,7 +364,6 @@ def generate_single_markdown_report_sync(cust_data, all_integrations):
              lines.append(row)
     lines.append(u"---")
 
-    # === BAGIAN KESIMPULAN UMUM (SAMA PERSIS DENGAN 03) ===
     lines.append(u"\n## 🧠 Ringkasan Status Global & Aksi")
     
     if none_target_count > 0:
@@ -495,15 +483,13 @@ def find_parent_devices():
         print("[ERROR] Gagal mendapatkan daftar dari root repositori.")
         return []
     
-    # --- PERBAIKAN: Mengabaikan direktori laporan (REPORT_DIR) ---
     devices = sorted([
         item['name'] 
         for item in items 
         if item.get('type') == 'dir' 
         and not item.get('name', '').startswith('.')
-        and item.get('name') != REPORT_DIR  # Whitelist: Abaikan 'monitoring-integration'
+        and item.get('name') != REPORT_DIR
     ])
-    # --- AKHIR PERBAIKAN ---
     
     print("[INFO] Ditemukan {} perangkat induk.".format(len(devices)))
     return devices
@@ -515,17 +501,12 @@ def find_plugins_in_parent(parent_path, current_path=""):
 
     found_plugins = []
     
-    # [LOGIC BARU]
-    # Cek apakah folder ini punya ciri-ciri plugin (ada config.json ATAU ada file .tsv)
     has_config = any(item.get('type') == 'file' and item.get('name') == 'config.json' for item in items)
     has_tsv = any(item.get('type') == 'file' and item.get('name', '').endswith('_plugin-sids.tsv') for item in items)
 
-    # Kuncinya disini: KITA HAPUS "and not has_subdirs"
-    # Jadi mau dia punya anak atau cucu, kalo dia punya file config/tsv, dia dianggap plugin.
     if has_config or has_tsv: 
         found_plugins.append(full_path)
 
-    # Tetep cari ke dalem buat listing submodul lainnya
     for item in items:
         if item.get('type') == 'dir':
             new_relative_path = os.path.join(current_path, item['name']).replace("\\", "/")
@@ -577,6 +558,58 @@ def select_from_list(options, title, can_go_back=False):
              idx = int(choice) - 1
              if 0 <= idx < len(options): return options[idx]
         print("[ERROR] Pilihan tidak valid.")
+
+# --- [FITUR BARU] MENU SELECT FOLDER VECTOR ---
+def select_vector_target_folder(repo_parent_name):
+    """
+    Menampilkan daftar folder yang ada di VECTOR_CONFIG_BASE_DIR
+    dan membiarkan user memilih target.
+    """
+    base_dir = VECTOR_CONFIG_BASE_DIR
+    if not base_dir:
+        print("[WARN] VECTOR_CONFIG_BASE_DIR belum diset. Menggunakan default repo: {}".format(repo_parent_name))
+        return repo_parent_name
+
+    print_header("Pilih Folder Tujuan Vector")
+    print("Path Base Server: {}".format(base_dir))
+    
+    existing_folders = []
+    if os.path.isdir(base_dir):
+        try:
+            existing_folders = sorted([d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))])
+        except Exception as e:
+            print("[ERROR] Gagal membaca direktori: {}".format(e))
+    
+    print("\nOpsi Tujuan:")
+    print("1. [BUAT BARU/DEFAULT] Gunakan nama dari Repo: '{}'".format(repo_parent_name))
+    
+    idx = 2
+    valid_options = [1]
+    
+    for folder in existing_folders:
+        print("{}. [EXISTING] Masukkan ke folder: '{}'".format(idx, folder))
+        valid_options.append(idx)
+        idx += 1
+        
+    print("{}. [CUSTOM] Ketik nama folder baru secara manual...".format(idx))
+    valid_options.append(idx)
+    
+    while True:
+        choice = input("\nPilih nomor tujuan [1-{}]: ".format(idx)).strip()
+        if not choice.isdigit(): continue
+        choice = int(choice)
+        
+        if choice in valid_options:
+            if choice == 1:
+                return repo_parent_name
+            elif choice == idx: # Opsi terakhir (Custom)
+                custom_name = input("Masukkan nama folder baru: ").strip()
+                if custom_name: return custom_name
+            else:
+                return existing_folders[choice - 2]
+        
+        print("[ERROR] Pilihan tidak valid.")
+# --- [AKHIR FITUR BARU] ---
 
 def select_plugins_from_list(available_plugins, title):
     print_header(title)
@@ -658,6 +691,12 @@ def display_summary(selection):
     print("Cakupan Pasif         : {}".format(selection.get('passive_scope_desc', 'N/A')))
     print("Total Plugin Proses  : {} ({} fokal + {} pasif)".format(len(total), len(focal), len(passive)))
     print("Aksi Utama           : {}".format(selection.get('action', 'N/A')))
+    
+    # --- Tambahan Info Folder Vector ---
+    if 'vector_target_folder' in selection:
+        print("Target Folder Vector : {}".format(selection['vector_target_folder']))
+    # -----------------------------------
+
     print("Plugin Aktif (Notif) : {} dari {} fokal".format(len(active_notif), len(focal)))
     for p in active_notif: print("    - {}".format(p))
     print("="*60)
@@ -666,7 +705,6 @@ def display_summary(selection):
 def process_plugin(plugin_path):
     print_header("Mengunduh Plugin (Files Only): {}".format(plugin_path))
     
-    # Ambil daftar isi folder dari GitHub
     items = gh_api_get(plugin_path)
     if not isinstance(items, list): return None
 
@@ -677,13 +715,10 @@ def process_plugin(plugin_path):
     downloaded_files = {"path": plugin_path}
     successful_downloads = 0
 
-    # [LOGIC DOWNLOAD "DANGKAL"]
     for item in items:
-        # Kalo dia FOLDER --> SKIP / ABAIKAN (Sesuai request)
         if item.get('type') == 'dir':
             continue 
             
-        # Kalo dia FILE --> DOWNLOAD
         if item.get('type') == 'file':
             remote_file_path = item.get('path')
             local_file_path = os.path.join(local_plugin_dir, item.get('name'))
@@ -692,10 +727,8 @@ def process_plugin(plugin_path):
             
             if saved_path: 
                 successful_downloads += 1
-                # Coba tangkap slug dari file tsv kalo ketemu
                 if slug_detected and not full_slug: full_slug = slug_detected
                 
-                # Mapping file untuk keperluan distribusi nanti
                 fname = item.get('name')
                 if fname.endswith('_updater.json'): downloaded_files["updater_cfg"] = saved_path
                 elif fname.endswith('_plugin-sids.tsv'): downloaded_files["tsv"] = saved_path
@@ -704,12 +737,10 @@ def process_plugin(plugin_path):
                 elif fname.startswith('70_transform_') and fname.endswith('.yaml'): downloaded_files["vector_conf"] = saved_path
                 elif fname.startswith('directives_') and fname.endswith('.json'): downloaded_files["directive"] = saved_path
 
-    # Fallback: Kalo slug gak ketemu dari fungsi download (misal tsv gak kedownload), coba cari manual
     if not full_slug and "tsv" in downloaded_files:
         full_slug = os.path.basename(downloaded_files["tsv"]).replace('_plugin-sids.tsv', '')
 
     if not full_slug:
-        # Coba cari dari nama updater json
         if "updater_cfg" in downloaded_files:
              full_slug = os.path.basename(downloaded_files["updater_cfg"]).replace('_updater.json', '')
         else:
@@ -741,11 +772,15 @@ def distribute_logstash(downloaded_files):
     else: print("[WARN] File directive hilang."); success = False
     return success
 
-def distribute_vector(downloaded_files, parent):
+# [FIX] Update Parameter & Tambahkan Logika Directive
+def distribute_vector(downloaded_files, target_folder_name):
     print_header("Distribusi ke Vector untuk: {}".format(downloaded_files.get('path', 'N/A')))
     success = True
+    
+    # Gunakan target_folder_name hasil pilihan user
     if "vector_conf" in downloaded_files and VECTOR_CONFIG_BASE_DIR:
-        vector_target_dir = os.path.join(VECTOR_CONFIG_BASE_DIR, parent); safe_makedirs(vector_target_dir)
+        vector_target_dir = os.path.join(VECTOR_CONFIG_BASE_DIR, target_folder_name)
+        safe_makedirs(vector_target_dir)
         success &= safe_copy(downloaded_files["vector_conf"], vector_target_dir)
     else: print("[WARN] File vector_conf atau VECTOR_CONFIG_BASE_DIR hilang."); success = False
 
@@ -753,20 +788,14 @@ def distribute_vector(downloaded_files, parent):
         print("[DIST] Mencari direktori NFS 'dsiem-plugin-tsv' di {}...".format(NFS_BASE_DIR))
         nfs_target_dir = None
         
-        # [FIX] LOGIC PINTAR NFS
         if not DRY_RUN:
-            # 1. Cek langsung: apakah NFS_BASE_DIR itu sendiri adalah targetnya? (e.g. /mnt/NAS/dsiem-plugin-tsv)
             if os.path.basename(NFS_BASE_DIR.rstrip('/')) == 'dsiem-plugin-tsv':
-                 if os.path.isdir(NFS_BASE_DIR):
-                     nfs_target_dir = NFS_BASE_DIR
+                 if os.path.isdir(NFS_BASE_DIR): nfs_target_dir = NFS_BASE_DIR
             
-            # 2. Cek subfolder: apakah target ada DI DALAM path yg diinput? (e.g. input /mnt/NAS, target /mnt/NAS/dsiem-plugin-tsv)
             if not nfs_target_dir:
                  candidate = os.path.join(NFS_BASE_DIR, 'dsiem-plugin-tsv')
-                 if os.path.isdir(candidate):
-                     nfs_target_dir = candidate
+                 if os.path.isdir(candidate): nfs_target_dir = candidate
 
-            # 3. Fallback: Logika lama (Cari di dalam folder PVC)
             if not nfs_target_dir:
                 try:
                     if os.path.isdir(NFS_BASE_DIR):
@@ -785,10 +814,17 @@ def distribute_vector(downloaded_files, parent):
                 success = False
         else: print("    -> [DRY RUN] Pencarian dan penyalinan NFS dilewati."); success = True
     else: print("[WARN] File tsv atau NFS_BASE_DIR hilang."); success = False
+
+    # --- [NEW] COPY DIRECTIVE KE FRONTEND ---
+    if "directive" in downloaded_files:
+        print("[DIST] Menyalin directive ke Pod Frontend...")
+        success &= safe_run_cmd(["kubectl", "cp", downloaded_files["directive"], "{}:/dsiem/configs/".format(FRONTEND_POD)])
+    else: 
+        print("[WARN] File directive hilang/tidak terdeteksi."); success = False
+
     return success
 
 def register_job(updater_path, is_focal_plugin, selected_action, distributed_physically):
-    """Mendaftarkan pekerjaan dan menetapkan status Target/Distribution."""
     if not updater_path or not os.path.exists(updater_path):
         print("[REG] File updater '{}' tidak valid. Pendaftaran dilewati.".format(updater_path)); return
     
@@ -800,10 +836,6 @@ def register_job(updater_path, is_focal_plugin, selected_action, distributed_phy
         with io.open(updater_path, 'r', encoding='utf-8') as f: updater_data = json.load(f, object_pairs_hook=OrderedDict)
         
         distribution_flag = selected_action.startswith("Distribusi")
-        
-        # LOGIKA PENTING: needs_distribution
-        # REVISI: Flag ini adalah KONFIGURASI ("Apakah plugin ini harus didistribusikan otomatis?"),
-        # bukan STATE ("Apakah plugin ini butuh distribusi sekarang?").
         needs_dist_flag = distribution_flag
 
         distribution_target = "None"
@@ -820,8 +852,9 @@ def register_job(updater_path, is_focal_plugin, selected_action, distributed_phy
 
         json_string_mod = json.dumps(updater_data, indent=2, ensure_ascii=False)
         try: 
+            # [FIX] Handle AttributeError untuk Python 3
             if isinstance(json_string_mod, str): json_string_mod = json_string_mod.decode('utf-8')
-        except NameError: pass
+        except (NameError, AttributeError): pass
         with io.open(updater_path, 'w', encoding='utf-8') as f_mod: f_mod.write(json_string_mod); f_mod.write(u'\n')
 
     except Exception as e:
@@ -858,9 +891,10 @@ def restart_stack(action):
         safe_run_cmd(["kubectl", "delete", "pod", "-l", VECTOR_POD_LABEL])
     
     if logstash_restarted or "Vector" in action:
-         safe_run_cmd(["kubectl", "delete", "pod", BACKEND_POD, FRONTEND_POD])
+         # [FIX] Hapus FRONTEND_POD, cukup BACKEND
+         safe_run_cmd(["kubectl", "delete", "pod", BACKEND_POD])
     else:
-         print("[INFO] Tidak ada pipeline (Logstash/Vector) yang di-restart, backend/frontend juga tidak.")
+         print("[INFO] Tidak ada pipeline (Logstash/Vector) yang di-restart, backend juga tidak.")
 
 # ====== FUNGSI MAIN (STATE MACHINE) ======
 def main():
@@ -943,6 +977,7 @@ def main():
             else:
                 current_step = 'active_plugins'
 
+        # --- [MODIFIED] Alur Distribusi Path & Pilih Folder ---
         elif current_step == 'distribution_paths':
             print_header("Konfigurasi Path Distribusi")
             
@@ -985,6 +1020,14 @@ def main():
                     print("[INFO] Variabel path telah diperbarui untuk sesi ini.")
                 else: continue
             
+            # --- [NEW] LOGIKA PILIH FOLDER VECTOR (Ditempatkan Disini) ---
+            if action_type == "Vector":
+                selected_folder = select_vector_target_folder(selection['parent'])
+                selection['vector_target_folder'] = selected_folder
+                print("\n[INFO] Target folder Vector ditetapkan ke: {}".format(selected_folder))
+                import time; time.sleep(1)
+            # -------------------------------------------------------------
+
             current_step = 'active_plugins'
         
         elif current_step == 'active_plugins':
@@ -1020,10 +1063,14 @@ def main():
             selected_action = selection['action']
             distributed_physically = False
             
-            # Distribusi HANYA JIKA dipilih & HANYA untuk FOKAL
             if "Distribusi" in selected_action:
                 print_header("Distribusi Plugin Fokal")
                 distributed_count = 0
+                
+                # --- [MODIFIED] Gunakan folder yang sudah dipilih sebelumnya ---
+                final_vector_folder = selection.get('vector_target_folder', selection['parent'])
+                # -------------------------------------------------------------
+
                 for downloaded in all_downloaded_files:
                     if downloaded['path'] in focal_paths_set:
                         
@@ -1031,7 +1078,7 @@ def main():
                         if "Logstash" in selected_action: 
                             dist_success = distribute_logstash(downloaded)
                         elif "Vector" in selected_action: 
-                            dist_success = distribute_vector(downloaded, selection['parent'])
+                            dist_success = distribute_vector(downloaded, final_vector_folder)
                             
                         if dist_success:
                              distributed_count += 1
@@ -1044,11 +1091,9 @@ def main():
 
             else: print("[INFO] Aksi 'HANYA Konfigurasi Auto-Update', distribusi dilewati.")
 
-            # Registrasi SEMUA job + set flag distribusi
             for downloaded in all_downloaded_files:
                 if "updater_cfg" in downloaded:
                     is_focal = downloaded['path'] in focal_paths_set
-                    # Logika needs_distribution di register_job() menggunakan distributed_physically
                     register_job(downloaded["updater_cfg"], is_focal, selected_action, distributed_physically)
                 else: print("[WARN] File updater_cfg tidak ada untuk {}, registrasi dilewati.".format(downloaded.get('path', 'N/A')))
 
